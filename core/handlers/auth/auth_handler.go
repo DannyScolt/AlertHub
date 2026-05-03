@@ -103,24 +103,18 @@ func (h *authHandler) Refresh(c *gin.Context) {
 }
 
 // Logout godoc
-// @Summary Logout the session for one refresh token
-// @Description Revokes the client-token session identified by the submitted refresh_token. This prevents that refresh token from being used again. Requires BearerAuth so Swagger users should authorize with the current access_token first.
+// @Summary Logout the current authenticated client
+// @Description Revokes active client-token sessions for the authenticated client. Send only `Authorization: Bearer <access_token>`; no request body or refresh_token is required.
 // @Tags Auth
-// @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param request body auth.LogoutRequest true "Logout payload containing the refresh_token for the session to revoke."
 // @Success 200 {object} common.APIResponse "Logout successful."
-// @Failure 400 {object} common.ErrorResponse "Validation error, such as missing refresh_token."
-// @Failure 401 {object} common.ErrorResponse "Missing/invalid access token or invalid refresh token."
+// @Failure 401 {object} common.ErrorResponse "Missing or invalid access token."
 // @Router /auth/logout [post]
 func (h *authHandler) Logout(c *gin.Context) {
-	var req authDto.LogoutRequest
-	if !bind(c, &req) {
-		return
-	}
-	if err := h.service.Logout(c.Request.Context(), req.RefreshToken); err != nil {
-		handleAuthError(c, err)
+	clientID := c.MustGet(middleware.ClientIDKey).(uuid.UUID)
+	if err := h.service.Logout(c.Request.Context(), clientID); err != nil {
+		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 		return
 	}
 	response.Success(c, http.StatusOK, "Logout successful", nil)

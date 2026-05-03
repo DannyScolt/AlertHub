@@ -114,28 +114,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Revokes the client-token session identified by the submitted refresh_token. This prevents that refresh token from being used again. Requires BearerAuth so Swagger users should authorize with the current access_token first.",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Revokes active client-token sessions for the authenticated client. Send only ` + "`" + `Authorization: Bearer \u003caccess_token\u003e` + "`" + `; no request body or refresh_token is required.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout the session for one refresh token",
-                "parameters": [
-                    {
-                        "description": "Logout payload containing the refresh_token for the session to revoke.",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/auth.LogoutRequest"
-                        }
-                    }
-                ],
+                "summary": "Logout the current authenticated client",
                 "responses": {
                     "200": {
                         "description": "Logout successful.",
@@ -143,14 +129,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/common.APIResponse"
                         }
                     },
-                    "400": {
-                        "description": "Validation error, such as missing refresh_token.",
-                        "schema": {
-                            "$ref": "#/definitions/common.ErrorResponse"
-                        }
-                    },
                     "401": {
-                        "description": "Missing/invalid access token or invalid refresh token.",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -1194,18 +1174,6 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "example": "password123"
-                }
-            }
-        },
-        "auth.LogoutRequest": {
-            "type": "object",
-            "required": [
-                "refresh_token"
-            ],
-            "properties": {
-                "refresh_token": {
-                    "type": "string",
-                    "example": "ah_refresh_2P8mYwD9kYf3nQxV7bA1cE4rT6uI0oPz"
                 }
             }
         },

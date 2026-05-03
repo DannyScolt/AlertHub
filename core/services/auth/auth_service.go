@@ -29,7 +29,7 @@ type AuthService interface {
 	Register(ctx context.Context, req authDto.RegisterRequest) (authDto.AuthData, error)
 	Login(ctx context.Context, req authDto.LoginRequest, userAgent string, ip net.IP) (authDto.AuthData, error)
 	Refresh(ctx context.Context, rawRefreshToken string, userAgent string, ip net.IP) (authDto.AuthData, error)
-	Logout(ctx context.Context, rawRefreshToken string) error
+	Logout(ctx context.Context, clientID uuid.UUID) error
 	LogoutAll(ctx context.Context, clientID uuid.UUID) error
 	ListSessions(ctx context.Context, clientID uuid.UUID) ([]authDto.SessionResponse, error)
 	RevokeSession(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID) error
@@ -115,12 +115,8 @@ func (s *authService) Refresh(ctx context.Context, rawRefreshToken string, userA
 	return data, nil
 }
 
-func (s *authService) Logout(ctx context.Context, rawRefreshToken string) error {
-	stored, err := s.clientTokens.FindByHash(ctx, apikey.Hash(rawRefreshToken))
-	if err != nil {
-		return ErrInvalidRefreshToken
-	}
-	return s.clientTokens.Revoke(ctx, stored.ID, "logout")
+func (s *authService) Logout(ctx context.Context, clientID uuid.UUID) error {
+	return s.clientTokens.RevokeAllByClientID(ctx, clientID, "logout")
 }
 
 func (s *authService) LogoutAll(ctx context.Context, clientID uuid.UUID) error {

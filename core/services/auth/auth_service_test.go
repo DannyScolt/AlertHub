@@ -72,11 +72,30 @@ func (r *authClientTokenRepoStub) RevokeFamily(ctx context.Context, tokenFamily 
 }
 
 func (r *authClientTokenRepoStub) RevokeAllByClientID(ctx context.Context, clientID uuid.UUID, reason string) error {
+	r.revokedClientID = clientID
+	r.revokedReason = reason
 	return nil
 }
 
 func (r *authClientTokenRepoStub) ListByClientID(ctx context.Context, clientID uuid.UUID) ([]clientTokenDomain.ClientToken, error) {
 	return nil, errors.New("ListByClientID should not be called when revoking one session")
+}
+
+func TestLogoutRevokesAuthenticatedClientSessions(t *testing.T) {
+	clientID := uuid.New()
+	repo := &authClientTokenRepoStub{}
+	service := NewAuthService(&config.Config{JWTAccessTTL: 15 * time.Minute, JWTRefreshTTL: 30 * 24 * time.Hour}, &authClientRepoStub{}, repo)
+
+	err := service.Logout(context.Background(), clientID)
+	if err != nil {
+		t.Fatalf("Logout returned error: %v", err)
+	}
+	if repo.revokedClientID != clientID {
+		t.Fatalf("expected client ID %s, got %s", clientID, repo.revokedClientID)
+	}
+	if repo.revokedReason != "logout" {
+		t.Fatalf("expected revoke reason logout, got %s", repo.revokedReason)
+	}
 }
 
 func TestRevokeSessionRevokesDirectlyByClientOwnership(t *testing.T) {

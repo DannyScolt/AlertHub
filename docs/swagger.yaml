@@ -165,14 +165,6 @@ definitions:
     - email
     - password
     type: object
-  auth.LogoutRequest:
-    properties:
-      refresh_token:
-        example: ah_refresh_2P8mYwD9kYf3nQxV7bA1cE4rT6uI0oPz
-        type: string
-    required:
-    - refresh_token
-    type: object
   auth.RefreshTokenRequest:
     properties:
       refresh_token:
@@ -576,19 +568,9 @@ paths:
       - Auth
   /auth/logout:
     post:
-      consumes:
-      - application/json
-      description: Revokes the client-token session identified by the submitted refresh_token.
-        This prevents that refresh token from being used again. Requires BearerAuth
-        so Swagger users should authorize with the current access_token first.
-      parameters:
-      - description: Logout payload containing the refresh_token for the session to
-          revoke.
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/auth.LogoutRequest'
+      description: 'Revokes active client-token sessions for the authenticated client.
+        Send only `Authorization: Bearer <access_token>`; no request body or refresh_token
+        is required.'
       produces:
       - application/json
       responses:
@@ -596,17 +578,13 @@ paths:
           description: Logout successful.
           schema:
             $ref: '#/definitions/common.APIResponse'
-        "400":
-          description: Validation error, such as missing refresh_token.
-          schema:
-            $ref: '#/definitions/common.ErrorResponse'
         "401":
-          description: Missing/invalid access token or invalid refresh token.
+          description: Missing or invalid access token.
           schema:
             $ref: '#/definitions/common.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Logout the session for one refresh token
+      summary: Logout the current authenticated client
       tags:
       - Auth
   /auth/logout-all:
