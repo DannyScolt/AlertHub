@@ -3,8 +3,10 @@ package device
 import (
 	"context"
 	"testing"
+	"time"
 
 	"alerthub/core/config"
+	alertDomain "alerthub/core/domain/alert"
 	domain "alerthub/core/domain/device"
 	deviceDto "alerthub/core/dto/device"
 	deviceRepo "alerthub/core/repository/device"
@@ -30,6 +32,10 @@ func (r *createDeviceRepoStub) FindByID(ctx context.Context, clientID, deviceID 
 	return domain.Device{}, deviceRepo.ErrDeviceNotFound
 }
 
+func (r *createDeviceRepoStub) FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error) {
+	return domain.Device{}, deviceRepo.ErrDeviceNotFound
+}
+
 func (r *createDeviceRepoStub) List(ctx context.Context, clientID uuid.UUID, filter deviceRepo.ListFilter) (deviceRepo.ListResult, error) {
 	return deviceRepo.ListResult{}, nil
 }
@@ -50,9 +56,27 @@ func (r *createDeviceRepoStub) UpdateAPIKeyHash(ctx context.Context, clientID, d
 	return nil
 }
 
+type deviceAlertRepoStub struct{}
+
+func (r deviceAlertRepoStub) Create(ctx context.Context, alert alertDomain.Alert) (alertDomain.Alert, error) {
+	return alertDomain.Alert{}, nil
+}
+
+func (r deviceAlertRepoStub) CreateBatch(ctx context.Context, alerts []alertDomain.Alert) ([]alertDomain.Alert, error) {
+	return nil, nil
+}
+
+func (r deviceAlertRepoStub) FindByID(ctx context.Context, alertID uuid.UUID) (alertDomain.Alert, error) {
+	return alertDomain.Alert{}, nil
+}
+
+func (r deviceAlertRepoStub) LatestOccurredAtByDeviceID(ctx context.Context, deviceID uuid.UUID) (*time.Time, error) {
+	return nil, nil
+}
+
 func TestCreateDeviceDefaultsOptionalTagsAndMetadata(t *testing.T) {
 	repo := &createDeviceRepoStub{}
-	service := NewDeviceService(&config.Config{DeviceAPIKeyPrefix: "ah_test"}, repo)
+	service := NewDeviceService(&config.Config{DeviceAPIKeyPrefix: "ah_test"}, repo, deviceAlertRepoStub{})
 
 	_, err := service.CreateDevice(context.Background(), uuid.New(), deviceDto.CreateDeviceRequest{
 		Name: "Minimal Device",

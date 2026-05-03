@@ -4,6 +4,7 @@ import (
 	"alerthub/core/config"
 	deviceHandler "alerthub/core/handlers/device"
 	"alerthub/core/middleware"
+	alertRepo "alerthub/core/repository/alert"
 	deviceRepo "alerthub/core/repository/device"
 	deviceService "alerthub/core/services/device"
 
@@ -13,7 +14,8 @@ import (
 
 func SetupDeviceRoutes(router *gin.Engine, cfg *config.Config, db *pgxpool.Pool) {
 	deviceRepository := deviceRepo.NewDeviceRepository(db)
-	service := deviceService.NewDeviceService(cfg, deviceRepository)
+	alertRepository := alertRepo.NewAlertRepository(db)
+	service := deviceService.NewDeviceService(cfg, deviceRepository, alertRepository)
 	handler := deviceHandler.NewDeviceHandler(service)
 
 	group := router.Group("/api/v1/devices")

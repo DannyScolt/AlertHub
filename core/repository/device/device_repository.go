@@ -37,6 +37,7 @@ type ListResult struct {
 type DeviceRepository interface {
 	Create(ctx context.Context, device domain.Device) (domain.Device, error)
 	FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error)
+	FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error)
 	List(ctx context.Context, clientID uuid.UUID, filter ListFilter) (ListResult, error)
 	Update(ctx context.Context, device domain.Device) (domain.Device, error)
 	SoftDelete(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error)
@@ -49,25 +50,44 @@ type deviceRepository struct{ db *pgxpool.Pool }
 
 func NewDeviceRepository(db *pgxpool.Pool) DeviceRepository { return &deviceRepository{db: db} }
 
+const deviceColumns = `id, client_id, name, type, status, api_key_hash, tags, metadata, created_at, updated_at, deleted_at`
+
+func scanDevice(row pgx.Row, d *domain.Device) error {
+	return row.Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
+}
+
 func (r *deviceRepository) Create(ctx context.Context, d domain.Device) (domain.Device, error) {
-	err := r.db.QueryRow(ctx, `INSERT INTO devices (client_id, name, type, status, api_key_hash, tags, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at`, d.ClientID, d.Name, d.Type, d.Status, d.APIKeyHash, d.Tags, d.Metadata).Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
-	if err != nil {
+	row := r.db.QueryRow(ctx, `INSERT INTO devices (client_id, name, type, status, api_key_hash, tags, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING `+deviceColumns, d.ClientID, d.Name, d.Type, d.Status, d.APIKeyHash, d.Tags, d.Metadata)
+	if err := scanDevice(row, &d); err != nil {
 		return domain.Device{}, mapPgError(err)
 	}
 	return d, nil
 }
 
 func (r *deviceRepository) FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error) {
-	query := `SELECT id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at FROM devices WHERE client_id=$1 AND id=$2`
+	query := `SELECT ` + deviceColumns + ` FROM devices WHERE client_id=$1 AND id=$2`
 	if !includeDeleted {
 		query += ` AND deleted_at IS NULL`
 	}
 	var d domain.Device
-	err := r.db.QueryRow(ctx, query, clientID, deviceID).Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Device{}, ErrDeviceNotFound
+	if err := scanDevice(r.db.QueryRow(ctx, query, clientID, deviceID), &d); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Device{}, ErrDeviceNotFound
+		}
+		return domain.Device{}, err
 	}
-	return d, err
+	return d, nil
+}
+
+func (r *deviceRepository) FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error) {
+	var d domain.Device
+	if err := scanDevice(r.db.QueryRow(ctx, `SELECT `+deviceColumns+` FROM devices WHERE api_key_hash=$1 AND deleted_at IS NULL`, apiKeyHash), &d); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Device{}, ErrDeviceNotFound
+		}
+		return domain.Device{}, err
+	}
+	return d, nil
 }
 
 func (r *deviceRepository) List(ctx context.Context, clientID uuid.UUID, filter ListFilter) (ListResult, error) {
@@ -90,13 +110,12 @@ func (r *deviceRepository) List(ctx context.Context, clientID uuid.UUID, filter 
 	where := strings.Join(conditions, " AND ")
 
 	var total int64
-	countQuery := `SELECT COUNT(*) FROM devices WHERE ` + where
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM devices WHERE `+where, args...).Scan(&total); err != nil {
 		return ListResult{}, err
 	}
 
 	args = append(args, filter.PageSize, filter.Offset)
-	query := `SELECT id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at FROM devices WHERE ` + where + ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argPos) + ` OFFSET $` + strconv.Itoa(argPos+1)
+	query := `SELECT ` + deviceColumns + ` FROM devices WHERE ` + where + ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argPos) + ` OFFSET $` + strconv.Itoa(argPos+1)
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return ListResult{}, err
@@ -106,7 +125,7 @@ func (r *deviceRepository) List(ctx context.Context, clientID uuid.UUID, filter 
 	devices := make([]domain.Device, 0)
 	for rows.Next() {
 		var d domain.Device
-		if err := rows.Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt); err != nil {
+		if err := scanDevice(rows, &d); err != nil {
 			return ListResult{}, err
 		}
 		devices = append(devices, d)
@@ -115,11 +134,11 @@ func (r *deviceRepository) List(ctx context.Context, clientID uuid.UUID, filter 
 }
 
 func (r *deviceRepository) Update(ctx context.Context, d domain.Device) (domain.Device, error) {
-	err := r.db.QueryRow(ctx, `UPDATE devices SET name=$3, type=$4, status=$5, tags=$6, metadata=$7, updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at`, d.ClientID, d.ID, d.Name, d.Type, d.Status, d.Tags, d.Metadata).Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Device{}, ErrDeviceNotFound
-	}
-	if err != nil {
+	row := r.db.QueryRow(ctx, `UPDATE devices SET name=$3, type=$4, status=$5, tags=$6, metadata=$7, updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING `+deviceColumns, d.ClientID, d.ID, d.Name, d.Type, d.Status, d.Tags, d.Metadata)
+	if err := scanDevice(row, &d); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Device{}, ErrDeviceNotFound
+		}
 		return domain.Device{}, mapPgError(err)
 	}
 	return d, nil
@@ -127,20 +146,23 @@ func (r *deviceRepository) Update(ctx context.Context, d domain.Device) (domain.
 
 func (r *deviceRepository) SoftDelete(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error) {
 	var d domain.Device
-	err := r.db.QueryRow(ctx, `UPDATE devices SET deleted_at=COALESCE(deleted_at, NOW()), updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at`, clientID, deviceID).Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Device{}, ErrDeviceNotFound
+	row := r.db.QueryRow(ctx, `UPDATE devices SET deleted_at=COALESCE(deleted_at, NOW()), updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING `+deviceColumns, clientID, deviceID)
+	if err := scanDevice(row, &d); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Device{}, ErrDeviceNotFound
+		}
+		return domain.Device{}, err
 	}
-	return d, err
+	return d, nil
 }
 
 func (r *deviceRepository) Restore(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error) {
 	var d domain.Device
-	err := r.db.QueryRow(ctx, `UPDATE devices SET deleted_at=NULL, status='inactive', updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING id, client_id, name, type, status, api_key_hash, tags, metadata, last_seen_at, created_at, updated_at, deleted_at`, clientID, deviceID).Scan(&d.ID, &d.ClientID, &d.Name, &d.Type, &d.Status, &d.APIKeyHash, &d.Tags, &d.Metadata, &d.LastSeenAt, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Device{}, ErrDeviceNotFound
-	}
-	if err != nil {
+	row := r.db.QueryRow(ctx, `UPDATE devices SET deleted_at=NULL, status='inactive', updated_at=NOW() WHERE client_id=$1 AND id=$2 RETURNING `+deviceColumns, clientID, deviceID)
+	if err := scanDevice(row, &d); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Device{}, ErrDeviceNotFound
+		}
 		return domain.Device{}, mapPgError(err)
 	}
 	return d, nil

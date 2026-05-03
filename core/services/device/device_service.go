@@ -9,6 +9,7 @@ import (
 	"alerthub/core/config"
 	domain "alerthub/core/domain/device"
 	deviceDto "alerthub/core/dto/device"
+	alertRepo "alerthub/core/repository/alert"
 	deviceRepo "alerthub/core/repository/device"
 	"alerthub/core/utils/apikey"
 	"alerthub/core/utils/pagination"
@@ -50,12 +51,13 @@ type DeviceService interface {
 }
 
 type deviceService struct {
-	cfg  *config.Config
-	repo deviceRepo.DeviceRepository
+	cfg       *config.Config
+	repo      deviceRepo.DeviceRepository
+	alertRepo alertRepo.AlertRepository
 }
 
-func NewDeviceService(cfg *config.Config, repo deviceRepo.DeviceRepository) DeviceService {
-	return &deviceService{cfg: cfg, repo: repo}
+func NewDeviceService(cfg *config.Config, repo deviceRepo.DeviceRepository, alerts alertRepo.AlertRepository) DeviceService {
+	return &deviceService{cfg: cfg, repo: repo, alertRepo: alerts}
 }
 
 func (s *deviceService) CreateDevice(ctx context.Context, clientID uuid.UUID, req deviceDto.CreateDeviceRequest) (deviceDto.DeviceWithAPIKeyResponse, error) {
@@ -119,7 +121,11 @@ func (s *deviceService) ListDevices(ctx context.Context, clientID uuid.UUID, inp
 	}
 	devices := make([]deviceDto.DeviceResponse, 0, len(result.Devices))
 	for _, d := range result.Devices {
-		devices = append(devices, toDeviceResponse(d))
+		dto, err := s.toDeviceResponse(ctx, d)
+		if err != nil {
+			return ListDevicesOutput{}, err
+		}
+		devices = append(devices, dto)
 	}
 	return ListDevicesOutput{Devices: devices, Total: result.Total, Page: page, PageSize: pageSize}, nil
 }
@@ -129,7 +135,7 @@ func (s *deviceService) GetDevice(ctx context.Context, clientID, deviceID uuid.U
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
-	return toDeviceResponse(d), nil
+	return s.toDeviceResponse(ctx, d)
 }
 
 func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uuid.UUID, req deviceDto.UpdateDeviceRequest) (deviceDto.DeviceResponse, error) {
@@ -174,7 +180,7 @@ func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uui
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
-	return toDeviceResponse(updated), nil
+	return s.toDeviceResponse(ctx, updated)
 }
 
 func (s *deviceService) DeleteDevice(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.DeleteDeviceResponse, error) {
@@ -207,7 +213,7 @@ func (s *deviceService) RestoreDevice(ctx context.Context, clientID, deviceID uu
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
-	return toDeviceResponse(restored), nil
+	return s.toDeviceResponse(ctx, restored)
 }
 
 func (s *deviceService) RotateAPIKey(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.RotateDeviceAPIKeyResponse, error) {
@@ -228,6 +234,10 @@ func (s *deviceService) RotateAPIKey(ctx context.Context, clientID, deviceID uui
 	return deviceDto.RotateDeviceAPIKeyResponse{ID: deviceID.String(), APIKey: rawKey, RotatedAt: time.Now()}, nil
 }
 
-func toDeviceResponse(d domain.Device) deviceDto.DeviceResponse {
-	return deviceDto.DeviceResponse{ID: d.ID.String(), Name: d.Name, Type: string(d.Type), Status: string(d.Status), Tags: d.Tags, Metadata: d.Metadata, LastSeenAt: d.LastSeenAt, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DeletedAt: d.DeletedAt}
+func (s *deviceService) toDeviceResponse(ctx context.Context, d domain.Device) (deviceDto.DeviceResponse, error) {
+	lastSeen, err := s.alertRepo.LatestOccurredAtByDeviceID(ctx, d.ID)
+	if err != nil {
+		return deviceDto.DeviceResponse{}, err
+	}
+	return deviceDto.DeviceResponse{ID: d.ID.String(), Name: d.Name, Type: string(d.Type), Status: string(d.Status), Tags: d.Tags, Metadata: d.Metadata, LastSeenAt: lastSeen, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, DeletedAt: d.DeletedAt}, nil
 }

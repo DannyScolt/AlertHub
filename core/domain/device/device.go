@@ -37,7 +37,6 @@ type Device struct {
 	APIKeyHash string
 	Tags       []string
 	Metadata   map[string]interface{}
-	LastSeenAt *time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  *time.Time

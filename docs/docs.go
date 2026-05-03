@@ -15,6 +15,52 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/alerts/stream": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Opens an SSE connection for the authenticated client. Use client JWT auth (` + "`" + `Authorization: Bearer \u003caccess_token\u003e` + "`" + `), not a device API key. The stream immediately sends ` + "`" + `event: connected` + "`" + `, then sends ` + "`" + `event: alert` + "`" + ` whenever one of the client's devices ingests an alert, and sends ` + "`" + `event: heartbeat` + "`" + ` every 30 seconds to keep the connection alive. Optional ` + "`" + `device_id` + "`" + ` filters alerts to one device owned by the client. Events from other clients are never delivered.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Stream realtime alerts to an authenticated client with Server-Sent Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
+                        "description": "Optional device UUID filter. When set, only alerts for this device are sent.",
+                        "name": "device_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream. Event types: connected, alert, heartbeat.",
+                        "schema": {
+                            "$ref": "#/definitions/alert.StreamAlertEvent"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid device_id query parameter.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid client access token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticates by email and password. The response returns a short-lived JWT access token plus an opaque refresh token. Invalid email and invalid password both return the same unauthorized response so credential existence is not leaked.",
@@ -781,6 +827,120 @@ const docTemplate = `{
                 }
             }
         },
+        "/events": {
+            "post": {
+                "security": [
+                    {
+                        "DeviceAPIKey": []
+                    }
+                ],
+                "description": "Accepts one append-only alert event from an authenticated device. Authenticate with the raw device API key returned by POST /devices or POST /devices/{id}/rotate-key using ` + "`" + `Authorization: Bearer ah_dev_...` + "`" + `. The API stores only the alert row, emits a PostgreSQL NOTIFY event for SSE subscribers, and never exposes api_key/api_key_hash in the response. ` + "`" + `severity` + "`" + ` must be one of info, warning, critical; ` + "`" + `type` + "`" + ` is a free string up to 100 characters; ` + "`" + `payload` + "`" + ` is optional JSON metadata; ` + "`" + `occurred_at` + "`" + ` is optional and defaults to server time.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Ingest one realtime alert event from a device",
+                "parameters": [
+                    {
+                        "description": "Single alert payload. Example severity values: info, warning, critical.",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/alert.IngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Event accepted; data.alert_id can be used to correlate stream events.",
+                        "schema": {
+                            "$ref": "#/definitions/alert.IngestEnvelopeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error: invalid severity, blank type, blank message, malformed JSON.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid, or soft-deleted device API key.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal insert or notify error.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/batch": {
+            "post": {
+                "security": [
+                    {
+                        "DeviceAPIKey": []
+                    }
+                ],
+                "description": "Accepts up to 100 alert events from one authenticated device. Valid events are inserted and notified; invalid events are returned in data.errors with their original index, so clients can retry only failed items. The response can contain both accepted alerts and rejected errors. Authentication uses ` + "`" + `Authorization: Bearer ah_dev_...` + "`" + ` with the raw device API key.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "Ingest a batch of realtime alert events from a device",
+                "parameters": [
+                    {
+                        "description": "Batch payload. events must contain 1..100 items. Partial failure is reported per index.",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/alert.BatchRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Batch processed; check data.accepted, data.rejected, data.alerts, and data.errors.",
+                        "schema": {
+                            "$ref": "#/definitions/alert.BatchEnvelopeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Empty batch, more than 100 events, malformed JSON, or invalid batch shape.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid, or soft-deleted device API key.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal insert or notify error.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "produces": [
@@ -802,6 +962,187 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "alert.BatchAcceptedAlert": {
+            "type": "object",
+            "properties": {
+                "alert_id": {
+                    "type": "string",
+                    "example": "9f3d2e1a-1234-4321-abcd-1234567890ab"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "alert.BatchEnvelopeResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/alert.BatchResponse"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Batch processed"
+                },
+                "status": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "alert.BatchError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "INVALID_SEVERITY"
+                },
+                "index": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "message": {
+                    "type": "string",
+                    "example": "severity must be one of info, warning, critical"
+                }
+            }
+        },
+        "alert.BatchRequest": {
+            "type": "object",
+            "required": [
+                "events"
+            ],
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/alert.IngestRequest"
+                    }
+                }
+            }
+        },
+        "alert.BatchResponse": {
+            "type": "object",
+            "properties": {
+                "accepted": {
+                    "type": "integer",
+                    "example": 98
+                },
+                "alerts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/alert.BatchAcceptedAlert"
+                    }
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/alert.BatchError"
+                    }
+                },
+                "rejected": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "alert.IngestEnvelopeResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/alert.IngestResponse"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Event accepted"
+                },
+                "status": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "alert.IngestRequest": {
+            "type": "object",
+            "required": [
+                "message",
+                "severity",
+                "type"
+            ],
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Temperature exceeded 80°C"
+                },
+                "occurred_at": {
+                    "type": "string",
+                    "example": "2026-05-03T12:00:00Z"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "severity": {
+                    "type": "string",
+                    "example": "warning"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "high_temperature"
+                }
+            }
+        },
+        "alert.IngestResponse": {
+            "type": "object",
+            "properties": {
+                "alert_id": {
+                    "type": "string",
+                    "example": "9f3d2e1a-1234-4321-abcd-1234567890ab"
+                },
+                "received_at": {
+                    "type": "string",
+                    "example": "2026-05-03T12:00:00.123Z"
+                }
+            }
+        },
+        "alert.StreamAlertEvent": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "9f3d2e1a-1234-4321-abcd-1234567890ab"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Temperature exceeded 80°C"
+                },
+                "occurred_at": {
+                    "type": "string",
+                    "example": "2026-05-03T12:00:00Z"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "received_at": {
+                    "type": "string",
+                    "example": "2026-05-03T12:00:00.123Z"
+                },
+                "severity": {
+                    "type": "string",
+                    "example": "warning"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "high_temperature"
+                }
+            }
+        },
         "auth.AuthData": {
             "type": "object",
             "properties": {
@@ -1331,6 +1672,13 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
+            "description": "Client JWT access token. Use value format: Bearer \u003caccess_token\u003e.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "DeviceAPIKey": {
+            "description": "Device API key returned once when creating or rotating a device. Use value format: Bearer ah_dev_...",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -1345,7 +1693,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "AlertHub API",
-	Description:      "AlertHub IoT device management API for Backlog 1.",
+	Description:      "AlertHub IoT device management and realtime alert ingestion API for Backlog 1 and Backlog 2.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
