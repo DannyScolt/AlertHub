@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_devices_client_name_active_unique;
+DROP INDEX IF EXISTS idx_devices_api_key_hash;
+DROP INDEX IF EXISTS idx_devices_deleted_at;
+DROP INDEX IF EXISTS idx_devices_client_type;
+DROP INDEX IF EXISTS idx_devices_client_status;
+DROP INDEX IF EXISTS idx_devices_client_id;
+DROP TABLE IF EXISTS devices;
+DROP TYPE IF EXISTS device_type;
+DROP TYPE IF EXISTS device_status;

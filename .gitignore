@@ -1,0 +1,53 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+
+# Go build artifacts
+/bin/
+/dist/
+/build/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Air hot reload
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Dependency/cache folders
+vendor/
+.cache/
+
+# Docker/local runtime data
+.docker/
+docker-data/
+postgres-data/
+adminer-data/
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local generated scratch files
+*.tmp
+*.bak
+
+# OpenSpec local planning artifacts
+openspec/

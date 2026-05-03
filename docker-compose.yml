@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alerthub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alerthub
+      POSTGRES_PASSWORD: alerthub
+      POSTGRES_DB: alerthub
+    ports:
+      - "5432:5432"
+    volumes:
+      - alerthub_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alerthub -d alerthub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alerthub-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://alerthub:alerthub@postgres:5432/alerthub?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: air -c .air.toml
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    container_name: alerthub-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://alerthub:alerthub@postgres:5432/alerthub?sslmode=disable",
+        "up"
+      ]
+
+  adminer:
+    image: adminer:4
+    container_name: alerthub-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  alerthub_postgres_data:

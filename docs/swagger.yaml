@@ -1,0 +1,811 @@
+basePath: /api/v1
+definitions:
+  auth.AuthClientResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        example: client@example.com
+        type: string
+      id:
+        example: 8c5c8a5e-6b74-48b4-9e0b-85a0c9ef1234
+        type: string
+      name:
+        example: Acme Inc
+        type: string
+      updated_at:
+        type: string
+    type: object
+  auth.AuthData:
+    properties:
+      access_token:
+        type: string
+      client:
+        $ref: '#/definitions/auth.AuthClientResponse'
+      expires_in:
+        example: 900
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  auth.AuthResponse:
+    properties:
+      data:
+        $ref: '#/definitions/auth.AuthData'
+      message:
+        example: Login successful
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        example: client@example.com
+        type: string
+      password:
+        example: password123
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        example: client@example.com
+        type: string
+      name:
+        example: Demo Client
+        type: string
+      password:
+        example: password123
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  auth.SessionResponse:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      last_used_at:
+        type: string
+      revoke_reason:
+        type: string
+      revoked_at:
+        type: string
+      token_family:
+        type: string
+      user_agent:
+        type: string
+    type: object
+  auth.SessionsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/auth.SessionResponse'
+        type: array
+      message:
+        example: Sessions retrieved successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  client.ClientResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        example: client@example.com
+        type: string
+      id:
+        example: 8c5c8a5e-6b74-48b4-9e0b-85a0c9ef1234
+        type: string
+      name:
+        example: Acme Inc
+        type: string
+      updated_at:
+        type: string
+    type: object
+  client.MeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/client.ClientResponse'
+      message:
+        example: Client retrieved successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  common.APIResponse:
+    properties:
+      data: {}
+      message:
+        example: Success
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  common.ErrorBody:
+    properties:
+      code:
+        example: VALIDATION_ERROR
+        type: string
+      details: {}
+    type: object
+  common.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/common.ErrorBody'
+      message:
+        example: Request validation failed
+        type: string
+      status:
+        example: false
+        type: boolean
+    type: object
+  device.CreateDeviceEnvelopeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/device.DeviceWithAPIKeyResponse'
+      message:
+        example: Device created successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  device.CreateDeviceRequest:
+    properties:
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        example: Warehouse Temperature Sensor
+        type: string
+      status:
+        example: active
+        type: string
+      tags:
+        example:
+        - warehouse
+        - floor-1
+        items:
+          type: string
+        type: array
+      type:
+        example: temperature_sensor
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  device.DeleteDeviceEnvelopeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/device.DeleteDeviceResponse'
+      message:
+        example: Device deleted successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  device.DeleteDeviceResponse:
+    properties:
+      deleted_at:
+        type: string
+      id:
+        type: string
+      purge_after:
+        type: string
+    type: object
+  device.DeviceEnvelopeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/device.DeviceResponse'
+      message:
+        example: Device retrieved successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  device.DeviceResponse:
+    properties:
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      id:
+        type: string
+      last_seen_at:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  device.DeviceWithAPIKeyResponse:
+    properties:
+      api_key:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  device.ListDevicesResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/device.DeviceResponse'
+        type: array
+      message:
+        example: Devices retrieved successfully
+        type: string
+      pagination:
+        $ref: '#/definitions/device.PaginationMeta'
+      status:
+        example: true
+        type: boolean
+    type: object
+  device.PaginationMeta:
+    properties:
+      has_next:
+        example: true
+        type: boolean
+      has_previous:
+        example: false
+        type: boolean
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 100
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+    type: object
+  device.RotateDeviceAPIKeyEnvelopeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/device.RotateDeviceAPIKeyResponse'
+      message:
+        example: Device API key rotated successfully
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
+  device.RotateDeviceAPIKeyResponse:
+    properties:
+      api_key:
+        type: string
+      id:
+        type: string
+      rotated_at:
+        type: string
+    type: object
+  device.UpdateDeviceRequest:
+    properties:
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        example: Warehouse Temperature Sensor v2
+        type: string
+      status:
+        example: maintenance
+        type: string
+      tags:
+        example:
+        - warehouse
+        - floor-1
+        items:
+          type: string
+        type: array
+      type:
+        example: temperature_sensor
+        type: string
+    type: object
+info:
+  contact: {}
+  description: AlertHub IoT device management API for Backlog 1.
+  title: AlertHub API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      summary: Login client
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Logout request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout current session
+      tags:
+      - Auth
+  /auth/logout-all:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout all sessions
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      summary: Refresh tokens
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      summary: Register client
+      tags:
+      - Auth
+  /auth/sessions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.SessionsResponse'
+      security:
+      - BearerAuth: []
+      summary: List sessions
+      tags:
+      - Auth
+  /auth/sessions/{id}:
+    delete:
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Revoke session
+      tags:
+      - Auth
+  /clients/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/client.MeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current client profile
+      tags:
+      - Client
+  /devices:
+    get:
+      parameters:
+      - description: Device status
+        in: query
+        name: status
+        type: string
+      - description: Device type
+        in: query
+        name: type
+        type: string
+      - description: Include deleted devices
+        in: query
+        name: include_deleted
+        type: boolean
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.ListDevicesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List devices
+      tags:
+      - Devices
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Create device request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/device.CreateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/device.CreateDeviceEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create device
+      tags:
+      - Devices
+  /devices/{id}:
+    delete:
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.DeleteDeviceEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete device
+      tags:
+      - Devices
+    get:
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.DeviceEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get device detail
+      tags:
+      - Devices
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update device request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/device.UpdateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.DeviceEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update device
+      tags:
+      - Devices
+  /devices/{id}/restore:
+    post:
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.DeviceEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore deleted device
+      tags:
+      - Devices
+  /devices/{id}/rotate-key:
+    post:
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/device.RotateDeviceAPIKeyEnvelopeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Rotate device API key
+      tags:
+      - Devices
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.APIResponse'
+      summary: Health check
+      tags:
+      - Health
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
