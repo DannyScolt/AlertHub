@@ -56,6 +56,27 @@ alerts
 
 ---
 
+## Acceptance criteria
+
+Reviewer có thể xem Backlog 1 là hoàn thành khi các điều kiện bên dưới đều đúng:
+
+| Tiêu chí | Cách kiểm tra |
+| --- | --- |
+| Client đăng nhập được bằng demo credentials | `POST /auth/login` trả `access_token` và `refresh_token` |
+| Protected device APIs bắt buộc client JWT | Gọi không có `Authorization` trả `401 Unauthorized` |
+| Client tạo được device mới | `POST /devices` trả `201 Created` và có device `id` |
+| API trả raw device API key đúng một lần | Response create/rotate có `api_key`; list/detail không trả raw key |
+| Device API key không lưu raw trong DB | DB chỉ dùng `api_key_hash` |
+| Client xem được danh sách device của mình | `GET /devices` trả data + pagination |
+| Client lọc được device theo status | `GET /devices?status=active` chỉ trả device active |
+| Client không truy cập được device của client khác | Cross-client request không lộ dữ liệu |
+| Soft delete ẩn device khỏi list/detail mặc định | Sau `DELETE /devices/{id}`, list/detail không trả device như active |
+| Restore đưa device về lại trạng thái dùng được | `POST /devices/{id}/restore` thành công và status về `inactive` |
+| Rotate key trả key mới | `POST /devices/{id}/rotate-key` trả raw key mới |
+| Swagger đủ để reviewer tự test | Swagger UI có request/response và auth scheme rõ ràng |
+
+---
+
 ## Authentication cho Backlog 1
 
 Các API device yêu cầu client JWT access token.
@@ -110,6 +131,48 @@ camera
 gateway
 other
 ```
+
+---
+
+## Dữ liệu request/response quan trọng
+
+### Device create request
+
+| Field | Kiểu | Bắt buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `name` | string | Có | Tên device, unique theo từng client trong nhóm chưa soft-delete |
+| `type` | string enum | Có | Một trong các Device Type hợp lệ |
+| `status` | string enum | Có | Một trong các Device Status hợp lệ |
+| `tags` | string array | Không | Nhãn để client phân loại device |
+| `metadata` | object | Không | JSON metadata tự do, ví dụ location, firmware, serial |
+
+### Device response
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `id` | UUID của device |
+| `name` | Tên device |
+| `type` | Loại device |
+| `status` | Trạng thái hiện tại |
+| `tags` | Danh sách tag |
+| `metadata` | Metadata dạng JSON |
+| `api_key` | Chỉ có trong create/rotate response, không xuất hiện ở list/detail |
+| `last_seen_at` | Thời điểm alert mới nhất của device, có thể chưa có nếu device chưa gửi event |
+| `created_at` | Thời điểm tạo device |
+| `updated_at` | Thời điểm cập nhật gần nhất |
+
+### Pagination response
+
+`GET /devices` trả thêm object `pagination`:
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `page` | Trang hiện tại |
+| `page_size` | Số item mỗi trang |
+| `total` | Tổng số device match filter |
+| `total_pages` | Tổng số trang |
+| `has_next` | Có trang tiếp theo hay không |
+| `has_previous` | Có trang trước hay không |
 
 ---
 
@@ -455,6 +518,52 @@ Sau restore, device quay lại trạng thái `inactive`.
 | Xem device không thuộc client hiện tại | `404 Not Found` hoặc unauthorized scoped response |
 | Update device đã soft-delete | Business error |
 | Rotate key của device đã soft-delete | Business error |
+
+---
+
+## Checklist reviewer cho Backlog 1
+
+Có thể tick theo thứ tự này khi review:
+
+- [ ] Chạy `make dev-up` thành công.
+- [ ] Mở Swagger tại `http://localhost:8080/swagger/index.html`.
+- [ ] Login bằng `client@example.com / password123` thành công.
+- [ ] Authorize Swagger bằng `Bearer <access_token>`.
+- [ ] Gọi `GET /clients/me` thấy đúng client hiện tại.
+- [ ] Tạo device mới bằng `POST /devices` và lưu lại `id`, `api_key`.
+- [ ] Gọi `GET /devices` thấy device vừa tạo.
+- [ ] Gọi `GET /devices?status=active` thấy device active.
+- [ ] Gọi filter status khác để xác nhận API lọc đúng.
+- [ ] Gọi `GET /devices/{id}` thấy chi tiết device.
+- [ ] Gọi `PATCH /devices/{id}` đổi status/name/tags/metadata thành công.
+- [ ] Gọi `POST /devices/{id}/rotate-key` nhận raw API key mới.
+- [ ] Gọi `DELETE /devices/{id}` soft-delete thành công.
+- [ ] Xác nhận device đã soft-delete không còn xuất hiện như device active bình thường.
+- [ ] Gọi `POST /devices/{id}/restore` thành công và device về `inactive`.
+- [ ] Gọi API không có access token để xác nhận `401 Unauthorized`.
+
+---
+
+## Mapping yêu cầu đề bài sang implementation
+
+| Yêu cầu đề bài | Implementation trong project |
+| --- | --- |
+| Client đăng ký thiết bị mới | `POST /api/v1/devices` |
+| Thiết bị thuộc về client | Device record có `client_id`, lấy từ JWT access token |
+| Client xem danh sách thiết bị | `GET /api/v1/devices` |
+| Client truy vấn theo trạng thái | Query `status` trong `GET /api/v1/devices?status=active` |
+| Bảo vệ dữ liệu giữa các client | Repository/service scope theo `client_id` |
+| Device có API key để dùng ở Backlog 2 | `api_key` trả một lần khi create/rotate, DB lưu hash |
+
+---
+
+## Ghi chú cho reviewer
+
+- Backlog 1 không yêu cầu API xem alert; phần đó thuộc future Backlog 3.
+- `last_seen_at` là field dẫn xuất từ bảng `alerts`, không phải cột trong `devices`.
+- Nếu device chưa gửi alert, `last_seen_at` có thể chưa xuất hiện trong JSON response do giá trị nil.
+- Raw `api_key` không xuất hiện ở list/detail để tránh lộ secret.
+- Swagger là cách test nhanh nhất vì đã có sẵn authorize button cho Bearer token.
 
 ---
 

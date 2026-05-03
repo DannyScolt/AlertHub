@@ -90,6 +90,30 @@ Alert là append-only event: API hiện tại không update/delete alert.
 
 ---
 
+## Acceptance criteria
+
+Reviewer có thể xem Backlog 2 là hoàn thành khi các điều kiện bên dưới đều đúng:
+
+| Tiêu chí | Cách kiểm tra |
+| --- | --- |
+| Device gửi một alert hợp lệ thành công | `POST /events` trả `202 Accepted` và `alert_id` |
+| Device gửi batch events thành công | `POST /events/batch` trả số lượng `accepted/rejected` đúng |
+| Batch hỗ trợ partial success | Event hợp lệ được lưu, event lỗi nằm trong `errors` theo `index` |
+| Batch giới hạn tối đa 100 events | Batch rỗng hoặc quá 100 events bị reject |
+| Device auth tách biệt client auth | `/events` dùng device API key, không dùng client JWT |
+| SSE stream dùng client JWT | `/alerts/stream` không chấp nhận device API key |
+| Client nhận alert realtime qua SSE | Mở stream rồi gửi event sẽ thấy `event: alert` |
+| Stream gửi connected event ban đầu | Kết nối SSE trả `event: connected` |
+| Stream gửi heartbeat định kỳ | Sau khoảng 30 giây có `event: heartbeat` |
+| Stream filter theo device_id đúng | Query `device_id` chỉ nhận alert của device đó |
+| Không lộ dữ liệu cross-client | Client A không nhận alert của Client B |
+| Device đã soft-delete không gửi event được | Event request trả `401 Unauthorized` |
+| Alert được lưu append-only | Alert insert vào bảng `alerts`, không update/delete |
+| `last_seen_at` của device được tính từ alert | Sau khi gửi alert, device detail/list có thời điểm seen mới |
+| Swagger đủ để reviewer tự test | Swagger có `DeviceAPIKey` và `BearerAuth` rõ ràng |
+
+---
+
 ## Authentication cho Backlog 2
 
 ### Device gửi event
@@ -134,6 +158,54 @@ critical
 ```
 
 Nếu gửi severity khác, API trả lỗi validation/business error.
+
+---
+
+## Dữ liệu request/response quan trọng
+
+### Single event request
+
+| Field | Kiểu | Bắt buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `type` | string | Có | Loại cảnh báo, free string, không rỗng, tối đa 100 ký tự |
+| `severity` | string enum | Có | Một trong `info`, `warning`, `critical` |
+| `message` | string | Có | Nội dung cảnh báo, không rỗng |
+| `payload` | object | Không | Metadata JSON tự do từ device |
+| `occurred_at` | datetime | Không | Thời điểm event xảy ra ở device; nếu không gửi thì server dùng thời gian hiện tại |
+
+### Single event response
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `alert_id` | UUID của alert vừa được lưu |
+| `received_at` | Thời điểm server nhận và lưu event |
+
+### Batch request
+
+| Field | Kiểu | Bắt buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `events` | array | Có | Danh sách event, tối đa 100 item |
+
+Mỗi item trong `events` dùng cùng schema với single event request.
+
+### Batch response
+
+| Field | Ý nghĩa |
+| --- | --- |
+| `accepted` | Số event hợp lệ đã được lưu |
+| `rejected` | Số event bị reject |
+| `alerts` | Danh sách item thành công, gồm `index` và `alert_id` |
+| `errors` | Danh sách item lỗi, gồm `index`, `code`, `message` |
+
+`index` là vị trí của event trong mảng request ban đầu, giúp device retry đúng item bị lỗi.
+
+### SSE events
+
+| Event | Khi nào gửi | Data |
+| --- | --- | --- |
+| `connected` | Ngay khi stream mở thành công | `client_id`, `timestamp` |
+| `alert` | Khi device thuộc client gửi alert match filter | Alert payload realtime |
+| `heartbeat` | Định kỳ mỗi 30 giây | `timestamp` |
 
 ---
 
@@ -490,6 +562,85 @@ Response sẽ có `last_seen_at` tương ứng alert mới nhất:
   }
 }
 ```
+
+---
+
+## Checklist reviewer cho Backlog 2
+
+Có thể tick theo thứ tự này khi review:
+
+- [ ] Chạy `make dev-up` thành công.
+- [ ] Mở Swagger tại `http://localhost:8080/swagger/index.html`.
+- [ ] Login demo client và lấy `access_token`.
+- [ ] Tạo device mới và lưu `device_id`, `device_api_key`.
+- [ ] Mở `GET /alerts/stream` bằng client JWT và thấy `event: connected`.
+- [ ] Gửi một alert hợp lệ bằng `POST /events` với device API key.
+- [ ] Xác nhận response single event là `202 Accepted` và có `alert_id`.
+- [ ] Xác nhận SSE stream nhận được `event: alert`.
+- [ ] Gọi `GET /devices/{device_id}` và xác nhận `last_seen_at` đã được cập nhật/tính ra.
+- [ ] Mở stream với `?device_id=<device_id>` và xác nhận chỉ nhận alert của device đó.
+- [ ] Gửi batch có cả event hợp lệ và event lỗi.
+- [ ] Xác nhận batch response có `accepted`, `rejected`, `alerts`, `errors` đúng index.
+- [ ] Gửi event không có device API key và xác nhận `401 Unauthorized`.
+- [ ] Gửi event bằng client JWT thay vì device API key và xác nhận `401 Unauthorized`.
+- [ ] Mở stream không có client JWT và xác nhận `401 Unauthorized`.
+- [ ] Gửi severity không hợp lệ và xác nhận lỗi validation.
+- [ ] Gửi batch rỗng hoặc hơn 100 events và xác nhận bị reject.
+- [ ] Soft-delete device rồi thử gửi event bằng API key của device đó, xác nhận `401 Unauthorized`.
+
+---
+
+## Mapping yêu cầu đề bài sang implementation
+
+| Yêu cầu đề bài | Implementation trong project |
+| --- | --- |
+| Thiết bị gửi event cảnh báo | `POST /api/v1/events` dùng device API key |
+| Event được hệ thống tiếp nhận realtime | API lưu alert rồi phát PostgreSQL `NOTIFY` |
+| Client nhận realtime alert | `GET /api/v1/alerts/stream` qua SSE |
+| Device auth tách với client auth | Device dùng `ah_dev_xxx`, client dùng JWT access token |
+| Hệ thống hỗ trợ nhiều event | `POST /api/v1/events/batch`, tối đa 100 events |
+| Event lỗi không làm hỏng cả batch | Batch response trả `accepted/rejected` theo từng index |
+| Alert gắn đúng client/device | Alert lưu cả `client_id` và `device_id` |
+| Stream không lộ alert client khác | Fan-out filter theo `client_id` |
+
+---
+
+## Thiết kế realtime trong phạm vi challenge
+
+Project dùng PostgreSQL `LISTEN/NOTIFY` và SSE thay vì Kafka/Redis vì phạm vi Backlog 2 chỉ cần realtime fan-out đơn giản trong local challenge.
+
+```text
+API instance
+  ├── Insert alert vào PostgreSQL
+  ├── Gửi pg_notify sau khi insert thành công
+  ├── Listener nhận notification
+  └── Stream service gửi event tới subscriber đang mở SSE
+```
+
+Cách này phù hợp vì:
+
+- PostgreSQL đã là source of truth của project.
+- Không cần thêm broker cho bài challenge hiện tại.
+- SSE đơn giản hơn WebSocket cho luồng server push một chiều.
+- Alert vẫn được lưu bền vững trước khi fan-out realtime.
+
+Giới hạn hiện tại:
+
+- Chưa có replay missed events qua stream; nếu client disconnect thì có thể xem lại qua future Backlog 3.
+- Chưa có Redis/Kafka cho production scale nhiều instance lớn.
+- Chưa có rate limiting/idempotency key cho device traffic rất lớn.
+
+---
+
+## Ghi chú cho reviewer
+
+- `/events` và `/events/batch` không dùng client JWT; chúng dùng device API key.
+- `/alerts/stream` không dùng device API key; nó dùng client JWT.
+- Response ingest trả `202 Accepted` vì event đã được nhận/lưu và realtime fan-out là bước bất đồng bộ sau đó.
+- Batch partial success là intentional: device có thể retry đúng item lỗi thay vì gửi lại toàn bộ batch.
+- `payload` là JSON tự do, API không ép schema cụ thể để phù hợp nhiều loại device.
+- `occurred_at` là thời điểm device ghi nhận event; `received_at` là thời điểm server nhận event.
+- `last_seen_at` trên device được tính từ alert mới nhất, nên nó thể hiện hoạt động thực tế của device.
 
 ---
 
