@@ -104,7 +104,7 @@ func (h *authHandler) Refresh(c *gin.Context) {
 
 // Logout godoc
 // @Summary Logout the current authenticated client
-// @Description Revokes active client-token sessions for the authenticated client. Send only `Authorization: Bearer <access_token>`; no request body or refresh_token is required.
+// @Description Revokes active client-token sessions for the authenticated client. Send only `Authorization: Bearer <access_token>`; no request body is required.
 // @Tags Auth
 // @Produce json
 // @Security BearerAuth

@@ -114,7 +114,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Revokes active client-token sessions for the authenticated client. Send only ` + "`" + `Authorization: Bearer \u003caccess_token\u003e` + "`" + `; no request body or refresh_token is required.",
+                "description": "Revokes active client-token sessions for the authenticated client. Send only ` + "`" + `Authorization: Bearer \u003caccess_token\u003e` + "`" + `; no request body is required.",
                 "produces": [
                     "application/json"
                 ],
