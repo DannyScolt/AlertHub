@@ -17,6 +17,7 @@ const docTemplate = `{
     "paths": {
         "/auth/login": {
             "post": {
+                "description": "Authenticates by email and password. The response returns a short-lived JWT access token plus an opaque refresh token. Invalid email and invalid password both return the same unauthorized response so credential existence is not leaked.",
                 "consumes": [
                     "application/json"
                 ],
@@ -26,10 +27,10 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Login client",
+                "summary": "Login an existing client and issue tokens",
                 "parameters": [
                     {
-                        "description": "Login request",
+                        "description": "Client login payload. Development demo credentials: client@example.com / password123.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -40,19 +41,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Login successful; use data.access_token in the BearerAuth authorize button.",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Validation error.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Invalid credentials.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -67,6 +68,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Revokes the client-token session identified by the submitted refresh_token. This prevents that refresh token from being used again. Requires BearerAuth so Swagger users should authorize with the current access_token first.",
                 "consumes": [
                     "application/json"
                 ],
@@ -76,10 +78,10 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout current session",
+                "summary": "Logout the session for one refresh token",
                 "parameters": [
                     {
-                        "description": "Logout request",
+                        "description": "Logout payload containing the refresh_token for the session to revoke.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -90,9 +92,21 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Logout successful.",
                         "schema": {
                             "$ref": "#/definitions/common.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error, such as missing refresh_token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing/invalid access token or invalid refresh token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
                         }
                     }
                 }
@@ -105,18 +119,25 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Revokes every active client-token session owned by the authenticated client. Use this when the client wants to sign out from all devices/browsers.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout all sessions",
+                "summary": "Logout all sessions for the current client",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "All sessions logged out successfully.",
                         "schema": {
                             "$ref": "#/definitions/common.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
                         }
                     }
                 }
@@ -124,6 +145,7 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
+                "description": "Exchanges a valid refresh_token for a new access_token and refresh_token. The submitted refresh token is marked used/replaced; reusing an old replaced refresh token revokes its token family and returns 401.",
                 "consumes": [
                     "application/json"
                 ],
@@ -133,10 +155,10 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Refresh tokens",
+                "summary": "Rotate a refresh token and issue a new access token",
                 "parameters": [
                     {
-                        "description": "Refresh request",
+                        "description": "Refresh payload containing the raw refresh_token from register/login/previous refresh.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -147,13 +169,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Token refreshed successfully; replace the old refresh_token with the new one.",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
+                    "400": {
+                        "description": "Validation error, such as missing refresh_token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Invalid, expired, revoked, or reused refresh token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -163,6 +191,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
+                "description": "Creates a client account with name, unique email, and password. The response intentionally returns only access_token, refresh_token, token_type, and expires_in; it does not return client profile data. Use the access token as ` + "`" + `Authorization: Bearer \u003caccess_token\u003e` + "`" + ` for protected APIs.",
                 "consumes": [
                     "application/json"
                 ],
@@ -172,10 +201,10 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Register client",
+                "summary": "Register a new client and issue tokens",
                 "parameters": [
                     {
-                        "description": "Register request",
+                        "description": "Client registration payload. Password must be at least 8 characters.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -186,19 +215,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Client registered successfully; refresh_token is shown only in this response and is stored server-side only as a hash in client_tokens.",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Validation error, such as invalid email or short password.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Email already exists.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -213,18 +242,25 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns active and historical client-token sessions for the authenticated client. Raw refresh tokens and token hashes are never returned; only safe session metadata such as id, token_family, timestamps, user_agent, and ip_address are exposed.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "List sessions",
+                "summary": "List current client's token sessions",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Sessions retrieved successfully. Use a session id from this response with DELETE /auth/sessions/{id}.",
                         "schema": {
                             "$ref": "#/definitions/auth.SessionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
                         }
                     }
                 }
@@ -237,17 +273,19 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Revokes a single session owned by the authenticated client. The id must come from GET /auth/sessions. Revocation is scoped by client ownership, so a client cannot revoke another client's session.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Revoke session",
+                "summary": "Revoke one client-token session",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Session ID",
+                        "example": "9fe9e122-bfb1-4f3b-a2d0-f4acdd4cbd2d",
+                        "description": "Session ID from GET /auth/sessions",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -255,9 +293,21 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Session revoked successfully.",
                         "schema": {
                             "$ref": "#/definitions/common.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid session id.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing/invalid access token or session does not belong to the client.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
                         }
                     }
                 }
@@ -270,22 +320,29 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns the profile for the client identified by the Bearer access token. This endpoint never returns password hashes, refresh tokens, or client_tokens records.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Client"
                 ],
-                "summary": "Get current client profile",
+                "summary": "Get the authenticated client profile",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Current client profile.",
                         "schema": {
                             "$ref": "#/definitions/client.MeResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Authenticated client no longer exists.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -300,60 +357,83 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns paginated devices for the current client. By default soft-deleted devices are hidden. Use ` + "`" + `status` + "`" + ` to satisfy Backlog 1 filtering by device status; combine with ` + "`" + `type` + "`" + ` when needed. Allowed status values: active, inactive, maintenance, error. Allowed type values: temperature_sensor, humidity_sensor, smoke_detector, motion_sensor, door_sensor, camera, gateway, other.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Devices"
                 ],
-                "summary": "List devices",
+                "summary": "List devices owned by the authenticated client",
                 "parameters": [
                     {
+                        "enum": [
+                            "active",
+                            "inactive",
+                            "maintenance",
+                            "error"
+                        ],
                         "type": "string",
-                        "description": "Device status",
+                        "description": "Filter by device status: active, inactive, maintenance, error",
                         "name": "status",
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "temperature_sensor",
+                            "humidity_sensor",
+                            "smoke_detector",
+                            "motion_sensor",
+                            "door_sensor",
+                            "camera",
+                            "gateway",
+                            "other"
+                        ],
                         "type": "string",
-                        "description": "Device type",
+                        "description": "Filter by device type",
                         "name": "type",
                         "in": "query"
                     },
                     {
                         "type": "boolean",
-                        "description": "Include deleted devices",
+                        "default": false,
+                        "description": "Set true to include soft-deleted devices",
                         "name": "include_deleted",
                         "in": "query"
                     },
                     {
+                        "minimum": 1,
                         "type": "integer",
-                        "description": "Page",
+                        "default": 1,
+                        "description": "Page number, starts at 1",
                         "name": "page",
                         "in": "query"
                     },
                     {
+                        "maximum": 100,
+                        "minimum": 1,
                         "type": "integer",
-                        "description": "Page size",
+                        "default": 20,
+                        "description": "Items per page",
                         "name": "page_size",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Devices retrieved successfully with pagination metadata.",
                         "schema": {
                             "$ref": "#/definitions/device.ListDevicesResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid status, type, or pagination input.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -366,6 +446,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Creates an IoT device owned by the current client. ` + "`" + `type` + "`" + ` must be one of: temperature_sensor, humidity_sensor, smoke_detector, motion_sensor, door_sensor, camera, gateway, other. ` + "`" + `status` + "`" + ` is optional and defaults to active; allowed values are active, inactive, maintenance, error. Device names must be unique per client among non-deleted devices. The generated api_key is returned only once in this response and only its hash is stored.",
                 "consumes": [
                     "application/json"
                 ],
@@ -375,10 +456,10 @@ const docTemplate = `{
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Create device",
+                "summary": "Register a new device for the authenticated client",
                 "parameters": [
                     {
-                        "description": "Create device request",
+                        "description": "Device registration payload. tags and metadata are optional.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -389,25 +470,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Device created successfully; save data.api_key because it cannot be retrieved later.",
                         "schema": {
                             "$ref": "#/definitions/device.CreateDeviceEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Validation error, invalid device type, or invalid status.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "A non-deleted device with the same name already exists for this client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -422,16 +503,18 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns a non-deleted device owned by the authenticated client. Soft-deleted devices are not returned by this endpoint unless they are restored first.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Get device detail",
+                "summary": "Get one device by ID",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
                         "description": "Device ID",
                         "name": "id",
                         "in": "path",
@@ -440,25 +523,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Device retrieved successfully.",
                         "schema": {
                             "$ref": "#/definitions/device.DeviceEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid device id.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Device not found for this client or device is soft-deleted.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -471,16 +554,18 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Soft deletes a device owned by the authenticated client by setting deleted_at. Deleted devices are hidden from normal list/detail APIs. The response includes purge_after, which is the point after the configured restore window.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Delete device",
+                "summary": "Soft delete a device",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
                         "description": "Device ID",
                         "name": "id",
                         "in": "path",
@@ -489,25 +574,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Device deleted successfully; data.deleted_at and data.purge_after describe the deletion lifecycle.",
                         "schema": {
                             "$ref": "#/definitions/device.DeleteDeviceEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid device id.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Device not found for this client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -520,6 +605,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Partially updates a non-deleted device owned by the authenticated client. Send only the fields you want to change. Allowed status values: active, inactive, maintenance, error. Allowed type values: temperature_sensor, humidity_sensor, smoke_detector, motion_sensor, door_sensor, camera, gateway, other. Device name uniqueness is enforced per client among non-deleted devices.",
                 "consumes": [
                     "application/json"
                 ],
@@ -529,17 +615,18 @@ const docTemplate = `{
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Update device",
+                "summary": "Update a device",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
                         "description": "Device ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Update device request",
+                        "description": "Partial update payload. Omitted fields keep their existing values.",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -550,31 +637,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Device updated successfully.",
                         "schema": {
                             "$ref": "#/definitions/device.DeviceEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid device id, invalid type/status, validation error, or deleted device cannot be changed.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Device not found for this client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Updated name conflicts with another active device owned by the client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -589,16 +676,18 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Restores a device deleted within the configured restore window. Restored devices are set to inactive so the client can review them before using them again. Restore can fail if another active device now uses the same name.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Restore deleted device",
+                "summary": "Restore a soft-deleted device",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
                         "description": "Device ID",
                         "name": "id",
                         "in": "path",
@@ -607,31 +696,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Device restored successfully; restored status is inactive.",
                         "schema": {
                             "$ref": "#/definitions/device.DeviceEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid device id, device is not deleted, or restore window expired.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Device not found for this client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Restore conflicts with another active device name.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -646,16 +735,18 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Generates a new API key for a non-deleted device owned by the authenticated client and replaces the stored hash. The raw api_key is returned only once in this response; store it immediately because it cannot be retrieved later.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Devices"
                 ],
-                "summary": "Rotate device API key",
+                "summary": "Rotate a device API key",
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
                         "description": "Device ID",
                         "name": "id",
                         "in": "path",
@@ -664,25 +755,25 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Device API key rotated successfully.",
                         "schema": {
                             "$ref": "#/definitions/device.RotateDeviceAPIKeyEnvelopeResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid device id or deleted device cannot be changed.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Missing or invalid access token.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Device not found for this client.",
                         "schema": {
                             "$ref": "#/definitions/common.ErrorResponse"
                         }
@@ -715,14 +806,16 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 },
                 "expires_in": {
                     "type": "integer",
                     "example": 900
                 },
                 "refresh_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ah_refresh_2P8mYwD9kYf3nQxV7bA1cE4rT6uI0oPz"
                 },
                 "token_type": {
                     "type": "string",
@@ -770,7 +863,8 @@ const docTemplate = `{
             ],
             "properties": {
                 "refresh_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ah_refresh_2P8mYwD9kYf3nQxV7bA1cE4rT6uI0oPz"
                 }
             }
         },
@@ -781,7 +875,8 @@ const docTemplate = `{
             ],
             "properties": {
                 "refresh_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ah_refresh_2P8mYwD9kYf3nQxV7bA1cE4rT6uI0oPz"
                 }
             }
         },
@@ -818,25 +913,30 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "9fe9e122-bfb1-4f3b-a2d0-f4acdd4cbd2d"
                 },
                 "ip_address": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "127.0.0.1"
                 },
                 "last_used_at": {
                     "type": "string"
                 },
                 "revoke_reason": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "logout"
                 },
                 "revoked_at": {
                     "type": "string"
                 },
                 "token_family": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "0f1f1c17-f9e6-42f3-9341-1555a07ddf4e"
                 },
                 "user_agent": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Mozilla/5.0"
                 }
             }
         },
@@ -1012,7 +1112,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
                 },
                 "purge_after": {
                     "type": "string"
@@ -1045,7 +1146,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
                 },
                 "last_seen_at": {
                     "type": "string"
@@ -1055,19 +1157,26 @@ const docTemplate = `{
                     "additionalProperties": true
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Warehouse Temperature Sensor"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "active"
                 },
                 "tags": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "warehouse",
+                        "floor-1"
+                    ]
                 },
                 "type": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "temperature_sensor"
                 },
                 "updated_at": {
                     "type": "string"
@@ -1078,22 +1187,27 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "api_key": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ah_dev_uTx9s6Cq54wIhj3YgVSLW7B9sPlmY2xL"
                 },
                 "created_at": {
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
                 },
                 "name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Warehouse Temperature Sensor"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "active"
                 },
                 "type": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "temperature_sensor"
                 },
                 "updated_at": {
                     "type": "string"
@@ -1171,10 +1285,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "api_key": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "ah_dev_zr9v7X2kLj8QmP4eNs6CbT1aYw3Fh5Ux"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
                 },
                 "rotated_at": {
                     "type": "string"

@@ -20,12 +20,14 @@ func NewClientHandler(service clientService.ClientService) ClientHandler {
 }
 
 // Me godoc
-// @Summary Get current client profile
+// @Summary Get the authenticated client profile
+// @Description Returns the profile for the client identified by the Bearer access token. This endpoint never returns password hashes, refresh tokens, or client_tokens records.
 // @Tags Client
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} client.MeResponse
-// @Failure 401 {object} common.ErrorResponse
+// @Success 200 {object} client.MeResponse "Current client profile."
+// @Failure 401 {object} common.ErrorResponse "Missing or invalid access token."
+// @Failure 404 {object} common.ErrorResponse "Authenticated client no longer exists."
 // @Router /clients/me [get]
 func (h *clientHandler) Me(c *gin.Context) {
 	clientID := c.MustGet(middleware.ClientIDKey).(uuid.UUID)

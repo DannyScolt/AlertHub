@@ -31,14 +31,15 @@ func NewAuthHandler(service authService.AuthService) AuthHandler {
 }
 
 // Register godoc
-// @Summary Register client
+// @Summary Register a new client and issue tokens
+// @Description Creates a client account with name, unique email, and password. The response intentionally returns only access_token, refresh_token, token_type, and expires_in; it does not return client profile data. Use the access token as `Authorization: Bearer <access_token>` for protected APIs.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param request body auth.RegisterRequest true "Register request"
-// @Success 201 {object} auth.AuthResponse
-// @Failure 400 {object} common.ErrorResponse
-// @Failure 409 {object} common.ErrorResponse
+// @Param request body auth.RegisterRequest true "Client registration payload. Password must be at least 8 characters."
+// @Success 201 {object} auth.AuthResponse "Client registered successfully; refresh_token is shown only in this response and is stored server-side only as a hash in client_tokens."
+// @Failure 400 {object} common.ErrorResponse "Validation error, such as invalid email or short password."
+// @Failure 409 {object} common.ErrorResponse "Email already exists."
 // @Router /auth/register [post]
 func (h *authHandler) Register(c *gin.Context) {
 	var req authDto.RegisterRequest
@@ -54,14 +55,15 @@ func (h *authHandler) Register(c *gin.Context) {
 }
 
 // Login godoc
-// @Summary Login client
+// @Summary Login an existing client and issue tokens
+// @Description Authenticates by email and password. The response returns a short-lived JWT access token plus an opaque refresh token. Invalid email and invalid password both return the same unauthorized response so credential existence is not leaked.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param request body auth.LoginRequest true "Login request"
-// @Success 200 {object} auth.AuthResponse
-// @Failure 400 {object} common.ErrorResponse
-// @Failure 401 {object} common.ErrorResponse
+// @Param request body auth.LoginRequest true "Client login payload. Development demo credentials: client@example.com / password123."
+// @Success 200 {object} auth.AuthResponse "Login successful; use data.access_token in the BearerAuth authorize button."
+// @Failure 400 {object} common.ErrorResponse "Validation error."
+// @Failure 401 {object} common.ErrorResponse "Invalid credentials."
 // @Router /auth/login [post]
 func (h *authHandler) Login(c *gin.Context) {
 	var req authDto.LoginRequest
@@ -77,13 +79,15 @@ func (h *authHandler) Login(c *gin.Context) {
 }
 
 // Refresh godoc
-// @Summary Refresh tokens
+// @Summary Rotate a refresh token and issue a new access token
+// @Description Exchanges a valid refresh_token for a new access_token and refresh_token. The submitted refresh token is marked used/replaced; reusing an old replaced refresh token revokes its token family and returns 401.
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param request body auth.RefreshTokenRequest true "Refresh request"
-// @Success 200 {object} auth.AuthResponse
-// @Failure 401 {object} common.ErrorResponse
+// @Param request body auth.RefreshTokenRequest true "Refresh payload containing the raw refresh_token from register/login/previous refresh."
+// @Success 200 {object} auth.AuthResponse "Token refreshed successfully; replace the old refresh_token with the new one."
+// @Failure 400 {object} common.ErrorResponse "Validation error, such as missing refresh_token."
+// @Failure 401 {object} common.ErrorResponse "Invalid, expired, revoked, or reused refresh token."
 // @Router /auth/refresh [post]
 func (h *authHandler) Refresh(c *gin.Context) {
 	var req authDto.RefreshTokenRequest
@@ -99,13 +103,16 @@ func (h *authHandler) Refresh(c *gin.Context) {
 }
 
 // Logout godoc
-// @Summary Logout current session
+// @Summary Logout the session for one refresh token
+// @Description Revokes the client-token session identified by the submitted refresh_token. This prevents that refresh token from being used again. Requires BearerAuth so Swagger users should authorize with the current access_token first.
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param request body auth.LogoutRequest true "Logout request"
-// @Success 200 {object} common.APIResponse
+// @Param request body auth.LogoutRequest true "Logout payload containing the refresh_token for the session to revoke."
+// @Success 200 {object} common.APIResponse "Logout successful."
+// @Failure 400 {object} common.ErrorResponse "Validation error, such as missing refresh_token."
+// @Failure 401 {object} common.ErrorResponse "Missing/invalid access token or invalid refresh token."
 // @Router /auth/logout [post]
 func (h *authHandler) Logout(c *gin.Context) {
 	var req authDto.LogoutRequest
@@ -120,11 +127,13 @@ func (h *authHandler) Logout(c *gin.Context) {
 }
 
 // LogoutAll godoc
-// @Summary Logout all sessions
+// @Summary Logout all sessions for the current client
+// @Description Revokes every active client-token session owned by the authenticated client. Use this when the client wants to sign out from all devices/browsers.
 // @Tags Auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} common.APIResponse
+// @Success 200 {object} common.APIResponse "All sessions logged out successfully."
+// @Failure 401 {object} common.ErrorResponse "Missing or invalid access token."
 // @Router /auth/logout-all [post]
 func (h *authHandler) LogoutAll(c *gin.Context) {
 	clientID := c.MustGet(middleware.ClientIDKey).(uuid.UUID)
@@ -136,11 +145,13 @@ func (h *authHandler) LogoutAll(c *gin.Context) {
 }
 
 // Sessions godoc
-// @Summary List sessions
+// @Summary List current client's token sessions
+// @Description Returns active and historical client-token sessions for the authenticated client. Raw refresh tokens and token hashes are never returned; only safe session metadata such as id, token_family, timestamps, user_agent, and ip_address are exposed.
 // @Tags Auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} auth.SessionsResponse
+// @Success 200 {object} auth.SessionsResponse "Sessions retrieved successfully. Use a session id from this response with DELETE /auth/sessions/{id}."
+// @Failure 401 {object} common.ErrorResponse "Missing or invalid access token."
 // @Router /auth/sessions [get]
 func (h *authHandler) Sessions(c *gin.Context) {
 	clientID := c.MustGet(middleware.ClientIDKey).(uuid.UUID)
@@ -153,12 +164,15 @@ func (h *authHandler) Sessions(c *gin.Context) {
 }
 
 // RevokeSession godoc
-// @Summary Revoke session
+// @Summary Revoke one client-token session
+// @Description Revokes a single session owned by the authenticated client. The id must come from GET /auth/sessions. Revocation is scoped by client ownership, so a client cannot revoke another client's session.
 // @Tags Auth
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Session ID"
-// @Success 200 {object} common.APIResponse
+// @Param id path string true "Session ID from GET /auth/sessions" example(9fe9e122-bfb1-4f3b-a2d0-f4acdd4cbd2d)
+// @Success 200 {object} common.APIResponse "Session revoked successfully."
+// @Failure 400 {object} common.ErrorResponse "Invalid session id."
+// @Failure 401 {object} common.ErrorResponse "Missing/invalid access token or session does not belong to the client."
 // @Router /auth/sessions/{id} [delete]
 func (h *authHandler) RevokeSession(c *gin.Context) {
 	clientID := c.MustGet(middleware.ClientIDKey).(uuid.UUID)

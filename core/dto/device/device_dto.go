@@ -19,11 +19,11 @@ type UpdateDeviceRequest struct {
 }
 
 type DeviceResponse struct {
-	ID         string                 `json:"id"`
-	Name       string                 `json:"name"`
-	Type       string                 `json:"type"`
-	Status     string                 `json:"status"`
-	Tags       []string               `json:"tags"`
+	ID         string                 `json:"id" example:"4d285f4b-2a87-4a86-a5b8-05b09c6d1234"`
+	Name       string                 `json:"name" example:"Warehouse Temperature Sensor"`
+	Type       string                 `json:"type" example:"temperature_sensor"`
+	Status     string                 `json:"status" example:"active"`
+	Tags       []string               `json:"tags" example:"warehouse,floor-1"`
 	Metadata   map[string]interface{} `json:"metadata"`
 	LastSeenAt *time.Time             `json:"last_seen_at,omitempty"`
 	CreatedAt  time.Time              `json:"created_at"`
@@ -32,24 +32,24 @@ type DeviceResponse struct {
 }
 
 type DeviceWithAPIKeyResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Type      string    `json:"type"`
-	Status    string    `json:"status"`
-	APIKey    string    `json:"api_key"`
+	ID        string    `json:"id" example:"4d285f4b-2a87-4a86-a5b8-05b09c6d1234"`
+	Name      string    `json:"name" example:"Warehouse Temperature Sensor"`
+	Type      string    `json:"type" example:"temperature_sensor"`
+	Status    string    `json:"status" example:"active"`
+	APIKey    string    `json:"api_key" example:"ah_dev_uTx9s6Cq54wIhj3YgVSLW7B9sPlmY2xL"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type DeleteDeviceResponse struct {
-	ID         string    `json:"id"`
+	ID         string    `json:"id" example:"4d285f4b-2a87-4a86-a5b8-05b09c6d1234"`
 	DeletedAt  time.Time `json:"deleted_at"`
 	PurgeAfter time.Time `json:"purge_after"`
 }
 
 type RotateDeviceAPIKeyResponse struct {
-	ID        string    `json:"id"`
-	APIKey    string    `json:"api_key"`
+	ID        string    `json:"id" example:"4d285f4b-2a87-4a86-a5b8-05b09c6d1234"`
+	APIKey    string    `json:"api_key" example:"ah_dev_zr9v7X2kLj8QmP4eNs6CbT1aYw3Fh5Ux"`
 	RotatedAt time.Time `json:"rotated_at"`
 }
 
