@@ -162,11 +162,7 @@ func (s *authService) issueTokens(ctx context.Context, c clientDomain.Client, us
 	if err != nil {
 		return authDto.AuthData{}, err
 	}
-	return authDto.AuthData{AccessToken: accessToken, RefreshToken: rawRefreshToken, TokenType: "Bearer", ExpiresIn: int64(s.cfg.JWTAccessTTL.Seconds()), Client: toClientResponse(c)}, nil
-}
-
-func toClientResponse(c clientDomain.Client) authDto.AuthClientResponse {
-	return authDto.AuthClientResponse{ID: c.ID.String(), Email: c.Email, Name: c.Name, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
+	return authDto.AuthData{AccessToken: accessToken, RefreshToken: rawRefreshToken, TokenType: "Bearer", ExpiresIn: int64(s.cfg.JWTAccessTTL.Seconds())}, nil
 }
 
 func toSessionResponse(t refreshDomain.RefreshToken) authDto.SessionResponse {

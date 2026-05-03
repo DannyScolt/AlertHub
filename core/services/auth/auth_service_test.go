@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"alerthub/core/config"
 	clientDomain "alerthub/core/domain/client"
 	refreshDomain "alerthub/core/domain/refresh_token"
+	authDto "alerthub/core/dto/auth"
 	clientRepo "alerthub/core/repository/client"
 	refreshRepo "alerthub/core/repository/refresh_token"
 
@@ -95,6 +97,38 @@ func TestRevokeSessionRevokesDirectlyByClientOwnership(t *testing.T) {
 	}
 	if repo.revokedReason != "session_revoked" {
 		t.Fatalf("expected revoke reason session_revoked, got %s", repo.revokedReason)
+	}
+}
+
+func TestAuthDataJSONContainsOnlyTokenFields(t *testing.T) {
+	data := authDto.AuthData{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("Marshal returned error: %v", err)
+	}
+
+	var fields map[string]interface{}
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+
+	if _, ok := fields["client"]; ok {
+		t.Fatalf("auth response should not include client field: %s", string(payload))
+	}
+	expectedFields := []string{"access_token", "refresh_token", "token_type", "expires_in"}
+	for _, field := range expectedFields {
+		if _, ok := fields[field]; !ok {
+			t.Fatalf("expected auth response to include %s: %s", field, string(payload))
+		}
+	}
+	if len(fields) != len(expectedFields) {
+		t.Fatalf("expected only token fields, got %s", string(payload))
 	}
 }
 

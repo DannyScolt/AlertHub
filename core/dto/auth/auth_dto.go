@@ -21,20 +21,11 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-type AuthClientResponse struct {
-	ID        string    `json:"id" example:"8c5c8a5e-6b74-48b4-9e0b-85a0c9ef1234"`
-	Email     string    `json:"email" example:"client@example.com"`
-	Name      string    `json:"name" example:"Acme Inc"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 type AuthData struct {
-	AccessToken  string             `json:"access_token"`
-	RefreshToken string             `json:"refresh_token"`
-	TokenType    string             `json:"token_type" example:"Bearer"`
-	ExpiresIn    int64              `json:"expires_in" example:"900"`
-	Client       AuthClientResponse `json:"client"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type" example:"Bearer"`
+	ExpiresIn    int64  `json:"expires_in" example:"900"`
 }
 
 type AuthResponse struct {

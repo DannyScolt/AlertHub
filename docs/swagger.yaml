@@ -1,27 +1,9 @@
 basePath: /api/v1
 definitions:
-  auth.AuthClientResponse:
-    properties:
-      created_at:
-        type: string
-      email:
-        example: client@example.com
-        type: string
-      id:
-        example: 8c5c8a5e-6b74-48b4-9e0b-85a0c9ef1234
-        type: string
-      name:
-        example: Acme Inc
-        type: string
-      updated_at:
-        type: string
-    type: object
   auth.AuthData:
     properties:
       access_token:
         type: string
-      client:
-        $ref: '#/definitions/auth.AuthClientResponse'
       expires_in:
         example: 900
         type: integer

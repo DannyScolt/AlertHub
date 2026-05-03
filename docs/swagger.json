@@ -704,37 +704,11 @@
         }
     },
     "definitions": {
-        "auth.AuthClientResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "example": "client@example.com"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "8c5c8a5e-6b74-48b4-9e0b-85a0c9ef1234"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Acme Inc"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "auth.AuthData": {
             "type": "object",
             "properties": {
                 "access_token": {
                     "type": "string"
-                },
-                "client": {
-                    "$ref": "#/definitions/auth.AuthClientResponse"
                 },
                 "expires_in": {
                     "type": "integer",
