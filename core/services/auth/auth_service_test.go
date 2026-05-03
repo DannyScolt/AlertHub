@@ -10,10 +10,10 @@ import (
 
 	"alerthub/core/config"
 	clientDomain "alerthub/core/domain/client"
-	refreshDomain "alerthub/core/domain/refresh_token"
+	clientTokenDomain "alerthub/core/domain/client_token"
 	authDto "alerthub/core/dto/auth"
 	clientRepo "alerthub/core/repository/client"
-	refreshRepo "alerthub/core/repository/refresh_token"
+	clientTokenRepo "alerthub/core/repository/client_token"
 
 	"github.com/google/uuid"
 )
@@ -36,53 +36,53 @@ func (r *authClientRepoStub) EmailExists(ctx context.Context, email string) (boo
 	return false, nil
 }
 
-type authRefreshRepoStub struct {
+type authClientTokenRepoStub struct {
 	revokedClientID  uuid.UUID
 	revokedSessionID uuid.UUID
 	revokedReason    string
 }
 
-func (r *authRefreshRepoStub) Create(ctx context.Context, token refreshDomain.RefreshToken) (refreshDomain.RefreshToken, error) {
-	return refreshDomain.RefreshToken{}, nil
+func (r *authClientTokenRepoStub) Create(ctx context.Context, token clientTokenDomain.ClientToken) (clientTokenDomain.ClientToken, error) {
+	return clientTokenDomain.ClientToken{}, nil
 }
 
-func (r *authRefreshRepoStub) FindByHash(ctx context.Context, tokenHash string) (refreshDomain.RefreshToken, error) {
-	return refreshDomain.RefreshToken{}, refreshRepo.ErrRefreshTokenNotFound
+func (r *authClientTokenRepoStub) FindByHash(ctx context.Context, tokenHash string) (clientTokenDomain.ClientToken, error) {
+	return clientTokenDomain.ClientToken{}, clientTokenRepo.ErrClientTokenNotFound
 }
 
-func (r *authRefreshRepoStub) MarkUsed(ctx context.Context, id uuid.UUID) error { return nil }
+func (r *authClientTokenRepoStub) MarkUsed(ctx context.Context, id uuid.UUID) error { return nil }
 
-func (r *authRefreshRepoStub) SetReplacedBy(ctx context.Context, id uuid.UUID, replacedByID uuid.UUID) error {
+func (r *authClientTokenRepoStub) SetReplacedBy(ctx context.Context, id uuid.UUID, replacedByID uuid.UUID) error {
 	return nil
 }
 
-func (r *authRefreshRepoStub) Revoke(ctx context.Context, id uuid.UUID, reason string) error {
+func (r *authClientTokenRepoStub) Revoke(ctx context.Context, id uuid.UUID, reason string) error {
 	return nil
 }
 
-func (r *authRefreshRepoStub) RevokeByClientID(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID, reason string) error {
+func (r *authClientTokenRepoStub) RevokeByClientID(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID, reason string) error {
 	r.revokedClientID = clientID
 	r.revokedSessionID = sessionID
 	r.revokedReason = reason
 	return nil
 }
 
-func (r *authRefreshRepoStub) RevokeFamily(ctx context.Context, tokenFamily uuid.UUID, reason string) error {
+func (r *authClientTokenRepoStub) RevokeFamily(ctx context.Context, tokenFamily uuid.UUID, reason string) error {
 	return nil
 }
 
-func (r *authRefreshRepoStub) RevokeAllByClientID(ctx context.Context, clientID uuid.UUID, reason string) error {
+func (r *authClientTokenRepoStub) RevokeAllByClientID(ctx context.Context, clientID uuid.UUID, reason string) error {
 	return nil
 }
 
-func (r *authRefreshRepoStub) ListByClientID(ctx context.Context, clientID uuid.UUID) ([]refreshDomain.RefreshToken, error) {
+func (r *authClientTokenRepoStub) ListByClientID(ctx context.Context, clientID uuid.UUID) ([]clientTokenDomain.ClientToken, error) {
 	return nil, errors.New("ListByClientID should not be called when revoking one session")
 }
 
 func TestRevokeSessionRevokesDirectlyByClientOwnership(t *testing.T) {
 	clientID := uuid.New()
 	sessionID := uuid.New()
-	repo := &authRefreshRepoStub{}
+	repo := &authClientTokenRepoStub{}
 	service := NewAuthService(&config.Config{JWTAccessTTL: 15 * time.Minute, JWTRefreshTTL: 30 * 24 * time.Hour}, &authClientRepoStub{}, repo)
 
 	err := service.RevokeSession(context.Background(), clientID, sessionID)
@@ -132,18 +132,18 @@ func TestAuthDataJSONContainsOnlyTokenFields(t *testing.T) {
 	}
 }
 
-var _ RefreshTokenRepoCompileCheck = (*authRefreshRepoStub)(nil)
+var _ ClientTokenRepoCompileCheck = (*authClientTokenRepoStub)(nil)
 
-type RefreshTokenRepoCompileCheck interface {
-	Create(ctx context.Context, token refreshDomain.RefreshToken) (refreshDomain.RefreshToken, error)
-	FindByHash(ctx context.Context, tokenHash string) (refreshDomain.RefreshToken, error)
+type ClientTokenRepoCompileCheck interface {
+	Create(ctx context.Context, token clientTokenDomain.ClientToken) (clientTokenDomain.ClientToken, error)
+	FindByHash(ctx context.Context, tokenHash string) (clientTokenDomain.ClientToken, error)
 	MarkUsed(ctx context.Context, id uuid.UUID) error
 	SetReplacedBy(ctx context.Context, id uuid.UUID, replacedByID uuid.UUID) error
 	Revoke(ctx context.Context, id uuid.UUID, reason string) error
 	RevokeByClientID(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID, reason string) error
 	RevokeFamily(ctx context.Context, tokenFamily uuid.UUID, reason string) error
 	RevokeAllByClientID(ctx context.Context, clientID uuid.UUID, reason string) error
-	ListByClientID(ctx context.Context, clientID uuid.UUID) ([]refreshDomain.RefreshToken, error)
+	ListByClientID(ctx context.Context, clientID uuid.UUID) ([]clientTokenDomain.ClientToken, error)
 }
 
 var _ = net.IP{}

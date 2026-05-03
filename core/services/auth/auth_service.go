@@ -8,10 +8,10 @@ import (
 
 	"alerthub/core/config"
 	clientDomain "alerthub/core/domain/client"
-	refreshDomain "alerthub/core/domain/refresh_token"
+	clientTokenDomain "alerthub/core/domain/client_token"
 	authDto "alerthub/core/dto/auth"
 	clientRepo "alerthub/core/repository/client"
-	refreshRepo "alerthub/core/repository/refresh_token"
+	clientTokenRepo "alerthub/core/repository/client_token"
 	"alerthub/core/utils/apikey"
 	"alerthub/core/utils/password"
 	"alerthub/core/utils/token"
@@ -36,13 +36,13 @@ type AuthService interface {
 }
 
 type authService struct {
-	cfg         *config.Config
-	clients     clientRepo.ClientRepository
-	refreshRepo refreshRepo.RefreshTokenRepository
+	cfg          *config.Config
+	clients      clientRepo.ClientRepository
+	clientTokens clientTokenRepo.ClientTokenRepository
 }
 
-func NewAuthService(cfg *config.Config, clients clientRepo.ClientRepository, refreshRepo refreshRepo.RefreshTokenRepository) AuthService {
-	return &authService{cfg: cfg, clients: clients, refreshRepo: refreshRepo}
+func NewAuthService(cfg *config.Config, clients clientRepo.ClientRepository, clientTokens clientTokenRepo.ClientTokenRepository) AuthService {
+	return &authService{cfg: cfg, clients: clients, clientTokens: clientTokens}
 }
 
 func (s *authService) Register(ctx context.Context, req authDto.RegisterRequest) (authDto.AuthData, error) {
@@ -80,7 +80,7 @@ func (s *authService) Login(ctx context.Context, req authDto.LoginRequest, userA
 
 func (s *authService) Refresh(ctx context.Context, rawRefreshToken string, userAgent string, ip net.IP) (authDto.AuthData, error) {
 	hash := apikey.Hash(rawRefreshToken)
-	stored, err := s.refreshRepo.FindByHash(ctx, hash)
+	stored, err := s.clientTokens.FindByHash(ctx, hash)
 	if err != nil {
 		return authDto.AuthData{}, ErrInvalidRefreshToken
 	}
@@ -89,7 +89,7 @@ func (s *authService) Refresh(ctx context.Context, rawRefreshToken string, userA
 		return authDto.AuthData{}, ErrInvalidRefreshToken
 	}
 	if stored.IsReplaced() {
-		_ = s.refreshRepo.RevokeFamily(ctx, stored.TokenFamily, "refresh_token_reuse")
+		_ = s.clientTokens.RevokeFamily(ctx, stored.TokenFamily, "refresh_token_reuse")
 		return authDto.AuthData{}, ErrInvalidRefreshToken
 	}
 
@@ -97,7 +97,7 @@ func (s *authService) Refresh(ctx context.Context, rawRefreshToken string, userA
 	if err != nil {
 		return authDto.AuthData{}, err
 	}
-	if err := s.refreshRepo.MarkUsed(ctx, stored.ID); err != nil {
+	if err := s.clientTokens.MarkUsed(ctx, stored.ID); err != nil {
 		return authDto.AuthData{}, err
 	}
 
@@ -105,30 +105,30 @@ func (s *authService) Refresh(ctx context.Context, rawRefreshToken string, userA
 	if err != nil {
 		return authDto.AuthData{}, err
 	}
-	newStored, err := s.refreshRepo.FindByHash(ctx, apikey.Hash(data.RefreshToken))
+	newStored, err := s.clientTokens.FindByHash(ctx, apikey.Hash(data.RefreshToken))
 	if err != nil {
 		return authDto.AuthData{}, err
 	}
-	if err := s.refreshRepo.SetReplacedBy(ctx, stored.ID, newStored.ID); err != nil {
+	if err := s.clientTokens.SetReplacedBy(ctx, stored.ID, newStored.ID); err != nil {
 		return authDto.AuthData{}, err
 	}
 	return data, nil
 }
 
 func (s *authService) Logout(ctx context.Context, rawRefreshToken string) error {
-	stored, err := s.refreshRepo.FindByHash(ctx, apikey.Hash(rawRefreshToken))
+	stored, err := s.clientTokens.FindByHash(ctx, apikey.Hash(rawRefreshToken))
 	if err != nil {
 		return ErrInvalidRefreshToken
 	}
-	return s.refreshRepo.Revoke(ctx, stored.ID, "logout")
+	return s.clientTokens.Revoke(ctx, stored.ID, "logout")
 }
 
 func (s *authService) LogoutAll(ctx context.Context, clientID uuid.UUID) error {
-	return s.refreshRepo.RevokeAllByClientID(ctx, clientID, "logout_all")
+	return s.clientTokens.RevokeAllByClientID(ctx, clientID, "logout_all")
 }
 
 func (s *authService) ListSessions(ctx context.Context, clientID uuid.UUID) ([]authDto.SessionResponse, error) {
-	tokens, err := s.refreshRepo.ListByClientID(ctx, clientID)
+	tokens, err := s.clientTokens.ListByClientID(ctx, clientID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (s *authService) ListSessions(ctx context.Context, clientID uuid.UUID) ([]a
 }
 
 func (s *authService) RevokeSession(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID) error {
-	if err := s.refreshRepo.RevokeByClientID(ctx, clientID, sessionID, "session_revoked"); err != nil {
+	if err := s.clientTokens.RevokeByClientID(ctx, clientID, sessionID, "session_revoked"); err != nil {
 		return ErrInvalidRefreshToken
 	}
 	return nil
@@ -158,14 +158,14 @@ func (s *authService) issueTokens(ctx context.Context, c clientDomain.Client, us
 	if tokenFamily == uuid.Nil {
 		tokenFamily = uuid.New()
 	}
-	_, err = s.refreshRepo.Create(ctx, refreshDomain.RefreshToken{ClientID: c.ID, TokenHash: apikey.Hash(rawRefreshToken), TokenFamily: tokenFamily, ExpiresAt: time.Now().Add(s.cfg.JWTRefreshTTL), UserAgent: userAgent, IPAddress: ip})
+	_, err = s.clientTokens.Create(ctx, clientTokenDomain.ClientToken{ClientID: c.ID, Name: "auth_session", TokenHash: apikey.Hash(rawRefreshToken), TokenFamily: tokenFamily, Abilities: []string{}, ExpiresAt: time.Now().Add(s.cfg.JWTRefreshTTL), UserAgent: userAgent, IPAddress: ip})
 	if err != nil {
 		return authDto.AuthData{}, err
 	}
 	return authDto.AuthData{AccessToken: accessToken, RefreshToken: rawRefreshToken, TokenType: "Bearer", ExpiresIn: int64(s.cfg.JWTAccessTTL.Seconds())}, nil
 }
 
-func toSessionResponse(t refreshDomain.RefreshToken) authDto.SessionResponse {
+func toSessionResponse(t clientTokenDomain.ClientToken) authDto.SessionResponse {
 	var ip *string
 	if t.IPAddress != nil {
 		value := t.IPAddress.String()

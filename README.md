@@ -1,13 +1,13 @@
 # AlertHub
 
-AlertHub is a Go REST API for the Backend Coding Challenge Backlog 1 scope. It focuses on client authentication, refresh-token session management, client profile access, and IoT device registration/query/management backed by PostgreSQL.
+AlertHub is a Go REST API for the Backend Coding Challenge Backlog 1 scope. It focuses on client authentication, client-token session management, client profile access, and IoT device registration/query/management backed by PostgreSQL.
 
 ## Tech Stack
 
 - Go + Gin
 - PostgreSQL + pgx
 - JWT access tokens
-- Opaque refresh tokens stored as hashes
+- Opaque refresh tokens persisted as `client_tokens` hashes
 - bcrypt password hashing
 - Swagger/OpenAPI via swaggo
 - Docker Compose for local development
@@ -155,7 +155,7 @@ GET /auth/sessions
 DELETE /auth/sessions/{id}
 ```
 
-Auth supports JWT access tokens and refresh-token sessions. Refresh tokens are opaque raw tokens returned to the client once and stored in the database only as hashes.
+Auth supports JWT access tokens and client-token sessions. Refresh tokens are opaque raw API values returned to the client once; persistence lives in `client_tokens` as hashes plus session metadata.
 
 ### Client
 
@@ -187,6 +187,14 @@ Soft-deleted devices are hidden by default. To include them:
 
 ```text
 GET /devices?include_deleted=true
+```
+
+## Database Structure
+
+```text
+clients       # Registered API clients; includes nullable remember_token for familiarity, not refresh-token storage
+client_tokens # Client auth sessions, refresh-token hashes, rotation chains, revoke/logout state, and metadata
+devices       # IoT devices owned by clients, with API key hashes and soft-delete state
 ```
 
 ## Device Rules

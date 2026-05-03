@@ -5,6 +5,7 @@ CREATE TABLE clients (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   name VARCHAR(100) NOT NULL,
+  remember_token TEXT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT clients_email_not_blank CHECK (length(trim(email)) > 0),

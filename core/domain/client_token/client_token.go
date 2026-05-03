@@ -1,4 +1,4 @@
-package refresh_token
+package client_token
 
 import (
 	"net"
@@ -7,15 +7,18 @@ import (
 	"github.com/google/uuid"
 )
 
-type RefreshToken struct {
+type ClientToken struct {
 	ID           uuid.UUID
 	ClientID     uuid.UUID
+	Name         string
 	TokenHash    string
 	TokenFamily  uuid.UUID
+	Abilities    []string
 	ParentID     *uuid.UUID
 	ReplacedByID *uuid.UUID
 	ExpiresAt    time.Time
 	CreatedAt    time.Time
+	UpdatedAt    time.Time
 	LastUsedAt   *time.Time
 	RevokedAt    *time.Time
 	RevokeReason *string
@@ -23,14 +26,14 @@ type RefreshToken struct {
 	IPAddress    *net.IP
 }
 
-func (t RefreshToken) IsExpired(now time.Time) bool {
+func (t ClientToken) IsExpired(now time.Time) bool {
 	return !t.ExpiresAt.After(now)
 }
 
-func (t RefreshToken) IsRevoked() bool {
+func (t ClientToken) IsRevoked() bool {
 	return t.RevokedAt != nil
 }
 
-func (t RefreshToken) IsReplaced() bool {
+func (t ClientToken) IsReplaced() bool {
 	return t.ReplacedByID != nil
 }

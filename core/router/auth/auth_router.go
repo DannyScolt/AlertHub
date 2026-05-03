@@ -9,7 +9,7 @@ import (
 	authHandler "alerthub/core/handlers/auth"
 	"alerthub/core/middleware"
 	clientRepo "alerthub/core/repository/client"
-	refreshRepo "alerthub/core/repository/refresh_token"
+	clientTokenRepo "alerthub/core/repository/client_token"
 	authService "alerthub/core/services/auth"
 	"alerthub/core/utils/password"
 
@@ -26,8 +26,8 @@ const (
 func SetupAuthRoutes(router *gin.Engine, cfg *config.Config, db *pgxpool.Pool) {
 	clientRepository := clientRepo.NewClientRepository(db)
 	seedSampleClient(context.Background(), cfg, clientRepository)
-	refreshTokenRepository := refreshRepo.NewRefreshTokenRepository(db)
-	service := authService.NewAuthService(cfg, clientRepository, refreshTokenRepository)
+	clientTokenRepository := clientTokenRepo.NewClientTokenRepository(db)
+	service := authService.NewAuthService(cfg, clientRepository, clientTokenRepository)
 	handler := authHandler.NewAuthHandler(service)
 
 	group := router.Group("/api/v1/auth")
