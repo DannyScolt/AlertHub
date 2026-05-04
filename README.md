@@ -30,6 +30,54 @@ Project có đầy đủ authentication cho client, device API key auth, alert i
 
 ---
 
+## Thời Gian Thực Hiện
+
+| Phần | Thời gian ước tính |
+| --- | --- |
+| Backlog 1 — Auth, device registration, device list/filter | 8 giờ |
+| Backlog 2 — Alert ingest, batch ingest, SSE realtime stream | 8 giờ |
+| Backlog 3 — Alert query/filter/pagination và chuẩn hóa query structure | 6 giờ |
+| Backlog 4 — Auto-escalation, Redis cooldown, listener và smoke tests | 6 giờ |
+| Backlog 5 — Alert search, indexes, docs và Swagger | 4 giờ |
+| Refactor theo SOLID, verification, reviewer docs | 6 giờ |
+
+Tổng thời gian ước tính: khoảng 38 giờ.
+
+---
+
+## Quick Start Cho Reviewer
+
+```bash
+cp .env.example .env
+make dev-up
+```
+
+Sau khi API start:
+
+```text
+API:     http://localhost:8080
+Swagger: http://localhost:8080/swagger/index.html
+Adminer: http://localhost:8081
+```
+
+Demo client development:
+
+```text
+Email: client@example.com
+Password: password123
+```
+
+Kiểm tra nhanh trước khi review:
+
+```bash
+go test ./...
+go build ./...
+go vet ./...
+docker compose config --quiet
+```
+
+---
+
 ## Công Nghệ Sử Dụng
 
 | Hạng mục | Công nghệ |
@@ -74,6 +122,23 @@ router -> handler -> service -> repository -> PostgreSQL
 ```
 
 `core/server` chỉ bootstrap Gin và gọi router tổng. Việc wire repository/service/handler nằm trong từng module router để giữ cấu trúc rõ ràng và dễ theo dõi.
+
+---
+
+## Quyết Định Thiết Kế Quan Trọng
+
+| Quyết định | Lý do |
+| --- | --- |
+| Dùng PostgreSQL làm storage chính | Phù hợp dữ liệu quan hệ `clients`/`devices`/`alerts`, hỗ trợ transaction, index, enum và JSONB payload |
+| Lưu refresh token dạng hash trong `client_tokens` | Không lưu raw refresh token, hỗ trợ rotate/revoke session an toàn hơn |
+| Device API key chỉ trả một lần và chỉ lưu hash | Giảm rủi ro lộ secret nếu database bị đọc trực tiếp |
+| Alert là append-only event | Phù hợp audit/history; không update/delete alert đã nhận |
+| SSE cho realtime stream | Đủ cho one-way realtime alert từ server về client, đơn giản hơn WebSocket cho scope challenge |
+| PostgreSQL `LISTEN/NOTIFY` cho alert fan-out nội bộ | Tái dùng Postgres, tránh thêm message broker khi chưa cần Kafka/RabbitMQ |
+| Redis cho auto-escalation cooldown | `SET NX EX` giúp claim cooldown atomic, tránh emit duplicate critical alert |
+| Backlog 5 search nằm trong `GET /alerts` | Search là filter của alert history nên dùng chung pagination/order/isolation của Backlog 3 |
+| `ILIKE` + `pg_trgm` cho search | Reviewer cần substring search theo message/type/device name; trigram index giúp giữ latency thấp |
+| Tách handler/service/repository theo focused interfaces | Giữ code dễ test, tránh service phụ thuộc repository methods không liên quan |
 
 ---
 
@@ -152,11 +217,14 @@ Khi chạy bằng Docker Compose, API container override `REDIS_HOST=redis`. Ở
 
 ## Chạy Project Bằng Docker
 
-Khởi động PostgreSQL, Adminer, chạy migrations và start API:
+Cách chạy tối giản nhất:
 
 ```bash
+cp .env.example .env
 make dev-up
 ```
+
+Lệnh `make dev-up` sẽ khởi động PostgreSQL, Adminer, chạy migrations và start API.
 
 Lệnh này sẽ chạy:
 
@@ -467,10 +535,23 @@ Chưa bao gồm trong phạm vi hiện tại:
 - Production Docker image hardening.
 - CI/CD pipeline.
 
+Nếu tiếp tục phát triển production-scale, hướng tiếp cận sẽ là:
+
+| Phần còn lại | Cách tiếp cận |
+| --- | --- |
+| Rate limiting | Thêm middleware theo client/device key, dùng Redis counter theo window |
+| Idempotency key | Lưu idempotency key theo client/device + request hash để chống ingest trùng |
+| Partition alert table | Partition `alerts` theo thời gian hoặc client khi dữ liệu tăng lớn |
+| Message broker | Chuyển LISTEN/NOTIFY sang Kafka/RabbitMQ nếu cần fan-out nhiều worker hoặc retry phức tạp |
+| Production hardening | Multi-stage Dockerfile, non-root user, healthcheck, resource limits, secret management |
+| CI/CD | Pipeline chạy test/build/vet/swagger check và migration validation trước merge/deploy |
+
 ---
 
 ## Ghi Chú Nộp Bài
 
+- Có thể nộp bằng GitHub repository public/private; nếu private thì cấp quyền truy cập cho reviewer.
+- Có thể nộp bằng file ZIP nếu reviewer yêu cầu qua email.
 - API đã có Swagger và có thể test trực tiếp bằng Swagger UI.
 - Development environment có seed demo client để reviewer test nhanh.
 - Database schema dùng `clients`, `client_tokens`, `devices`, và `alerts` để giữ mental model rõ ràng cho Backlog 1 đến Backlog 5.
