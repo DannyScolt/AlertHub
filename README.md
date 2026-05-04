@@ -47,7 +47,11 @@ Tổng thời gian ước tính: khoảng 24 giờ.
 
 ## Quick Start Cho Reviewer
 
+Clone repository và chạy project:
+
 ```bash
+git clone git@github.com:DannyScolt/AlertHub.git
+cd AlertHub
 cp .env.example .env
 make dev-up
 ```
