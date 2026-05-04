@@ -286,6 +286,13 @@ Request:
 }
 ```
 
+Giá trị hợp lệ khi tạo/cập nhật device:
+
+| Field | Giá trị hợp lệ |
+| --- | --- |
+| `type` | `temperature_sensor`, `humidity_sensor`, `smoke_detector`, `motion_sensor`, `door_sensor`, `camera`, `gateway`, `other` |
+| `status` | `active`, `inactive`, `maintenance`, `error` |
+
 Response mong đợi: `201 Created`
 
 ```json

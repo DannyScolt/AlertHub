@@ -379,6 +379,13 @@ Nếu muốn test end-to-end theo thứ tự Backlog 1 đến Backlog 5, dùng f
 
 - [docs/reviewer-test-flow.md](docs/reviewer-test-flow.md) — flow test tổng từ auth/device/event/query/escalation/search.
 
+Khi tạo hoặc cập nhật device, dùng các giá trị hợp lệ sau:
+
+| Field | Giá trị hợp lệ |
+| --- | --- |
+| `type` | `temperature_sensor`, `humidity_sensor`, `smoke_detector`, `motion_sensor`, `door_sensor`, `camera`, `gateway`, `other` |
+| `status` | `active`, `inactive`, `maintenance`, `error` |
+
 ---
 
 ## Luồng Test Backlog 1 Cho Reviewer

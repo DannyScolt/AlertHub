@@ -365,6 +365,11 @@ definitions:
         example: Warehouse Temperature Sensor
         type: string
       status:
+        enum:
+        - active
+        - inactive
+        - maintenance
+        - error
         example: active
         type: string
       tags:
@@ -375,6 +380,15 @@ definitions:
           type: string
         type: array
       type:
+        enum:
+        - temperature_sensor
+        - humidity_sensor
+        - smoke_detector
+        - motion_sensor
+        - door_sensor
+        - camera
+        - gateway
+        - other
         example: temperature_sensor
         type: string
     required:
@@ -535,6 +549,11 @@ definitions:
         example: Warehouse Temperature Sensor v2
         type: string
       status:
+        enum:
+        - active
+        - inactive
+        - maintenance
+        - error
         example: maintenance
         type: string
       tags:
@@ -545,16 +564,27 @@ definitions:
           type: string
         type: array
       type:
+        enum:
+        - temperature_sensor
+        - humidity_sensor
+        - smoke_detector
+        - motion_sensor
+        - door_sensor
+        - camera
+        - gateway
+        - other
         example: temperature_sensor
         type: string
     type: object
 info:
   contact: {}
-  description: AlertHub IoT device management and realtime alert API. Covers device
+  description: 'AlertHub IoT device management and realtime alert API. Covers device
     registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination
     (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search
     (Backlog 5). Use Authorize -> BearerAuth for client JWT (from /auth/login). Use
-    Authorize -> DeviceAPIKey for device API key (from POST /devices).
+    Authorize -> DeviceAPIKey for device API key (from POST /devices). Swagger UI
+    can paste the raw token/key directly; curl can use either Authorization: <token>
+    or Authorization: Bearer <token>.'
   title: AlertHub API
   version: "1.0"
 paths:
@@ -1314,13 +1344,16 @@ paths:
       - Health
 securityDefinitions:
   BearerAuth:
-    description: 'Client JWT access token. Use value format: Bearer <access_token>.'
+    description: 'Client JWT access token from /auth/login. In Swagger UI, paste data.access_token
+      directly. In curl, use either Authorization: <access_token> or Authorization:
+      Bearer <access_token>.'
     in: header
     name: Authorization
     type: apiKey
   DeviceAPIKey:
     description: 'Device API key returned once when creating or rotating a device.
-      Use value format: Bearer ah_dev_...'
+      In Swagger UI, paste ah_dev_... directly. In curl, use either Authorization:
+      ah_dev_... or Authorization: Bearer ah_dev_...'
     in: header
     name: Authorization
     type: apiKey

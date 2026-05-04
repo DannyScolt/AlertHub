@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -\u003e BearerAuth for client JWT (from /auth/login). Use Authorize -\u003e DeviceAPIKey for device API key (from POST /devices).",
+        "description": "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -\u003e BearerAuth for client JWT (from /auth/login). Use Authorize -\u003e DeviceAPIKey for device API key (from POST /devices). Swagger UI can paste the raw token/key directly; curl can use either Authorization: \u003ctoken\u003e or Authorization: Bearer \u003ctoken\u003e.",
         "title": "AlertHub API",
         "contact": {},
         "version": "1.0"
@@ -1566,6 +1566,12 @@
                 },
                 "status": {
                     "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive",
+                        "maintenance",
+                        "error"
+                    ],
                     "example": "active"
                 },
                 "tags": {
@@ -1580,6 +1586,16 @@
                 },
                 "type": {
                     "type": "string",
+                    "enum": [
+                        "temperature_sensor",
+                        "humidity_sensor",
+                        "smoke_detector",
+                        "motion_sensor",
+                        "door_sensor",
+                        "camera",
+                        "gateway",
+                        "other"
+                    ],
                     "example": "temperature_sensor"
                 }
             }
@@ -1805,6 +1821,12 @@
                 },
                 "status": {
                     "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive",
+                        "maintenance",
+                        "error"
+                    ],
                     "example": "maintenance"
                 },
                 "tags": {
@@ -1819,6 +1841,16 @@
                 },
                 "type": {
                     "type": "string",
+                    "enum": [
+                        "temperature_sensor",
+                        "humidity_sensor",
+                        "smoke_detector",
+                        "motion_sensor",
+                        "door_sensor",
+                        "camera",
+                        "gateway",
+                        "other"
+                    ],
                     "example": "temperature_sensor"
                 }
             }
@@ -1826,13 +1858,13 @@
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Client JWT access token. Use value format: Bearer \u003caccess_token\u003e.",
+            "description": "Client JWT access token from /auth/login. In Swagger UI, paste data.access_token directly. In curl, use either Authorization: \u003caccess_token\u003e or Authorization: Bearer \u003caccess_token\u003e.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
         },
         "DeviceAPIKey": {
-            "description": "Device API key returned once when creating or rotating a device. Use value format: Bearer ah_dev_...",
+            "description": "Device API key returned once when creating or rotating a device. In Swagger UI, paste ah_dev_... directly. In curl, use either Authorization: ah_dev_... or Authorization: Bearer ah_dev_...",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"

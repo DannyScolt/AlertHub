@@ -91,6 +91,13 @@ Body:
 }
 ```
 
+Giá trị hợp lệ:
+
+| Field | Giá trị hợp lệ |
+| --- | --- |
+| `type` | `temperature_sensor`, `humidity_sensor`, `smoke_detector`, `motion_sensor`, `door_sensor`, `camera`, `gateway`, `other` |
+| `status` | `active`, `inactive`, `maintenance`, `error` |
+
 Kỳ vọng:
 
 - `201 Created`

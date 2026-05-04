@@ -1573,6 +1573,12 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive",
+                        "maintenance",
+                        "error"
+                    ],
                     "example": "active"
                 },
                 "tags": {
@@ -1587,6 +1593,16 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string",
+                    "enum": [
+                        "temperature_sensor",
+                        "humidity_sensor",
+                        "smoke_detector",
+                        "motion_sensor",
+                        "door_sensor",
+                        "camera",
+                        "gateway",
+                        "other"
+                    ],
                     "example": "temperature_sensor"
                 }
             }
@@ -1812,6 +1828,12 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive",
+                        "maintenance",
+                        "error"
+                    ],
                     "example": "maintenance"
                 },
                 "tags": {
@@ -1826,6 +1848,16 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string",
+                    "enum": [
+                        "temperature_sensor",
+                        "humidity_sensor",
+                        "smoke_detector",
+                        "motion_sensor",
+                        "door_sensor",
+                        "camera",
+                        "gateway",
+                        "other"
+                    ],
                     "example": "temperature_sensor"
                 }
             }
@@ -1833,13 +1865,13 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Client JWT access token. Use value format: Bearer \u003caccess_token\u003e.",
+            "description": "Client JWT access token from /auth/login. In Swagger UI, paste data.access_token directly. In curl, use either Authorization: \u003caccess_token\u003e or Authorization: Bearer \u003caccess_token\u003e.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
         },
         "DeviceAPIKey": {
-            "description": "Device API key returned once when creating or rotating a device. Use value format: Bearer ah_dev_...",
+            "description": "Device API key returned once when creating or rotating a device. In Swagger UI, paste ah_dev_... directly. In curl, use either Authorization: ah_dev_... or Authorization: Bearer ah_dev_...",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -1854,7 +1886,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "AlertHub API",
-	Description:      "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -> BearerAuth for client JWT (from /auth/login). Use Authorize -> DeviceAPIKey for device API key (from POST /devices).",
+	Description:      "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -> BearerAuth for client JWT (from /auth/login). Use Authorize -> DeviceAPIKey for device API key (from POST /devices). Swagger UI can paste the raw token/key directly; curl can use either Authorization: <token> or Authorization: Bearer <token>.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

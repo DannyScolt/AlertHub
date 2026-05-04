@@ -4,16 +4,16 @@ import "time"
 
 type CreateDeviceRequest struct {
 	Name     string                 `json:"name" binding:"required" example:"Warehouse Temperature Sensor"`
-	Type     string                 `json:"type" binding:"required" example:"temperature_sensor"`
-	Status   string                 `json:"status" example:"active"`
+	Type     string                 `json:"type" binding:"required" enums:"temperature_sensor,humidity_sensor,smoke_detector,motion_sensor,door_sensor,camera,gateway,other" example:"temperature_sensor"`
+	Status   string                 `json:"status" enums:"active,inactive,maintenance,error" example:"active"`
 	Tags     []string               `json:"tags" example:"warehouse,floor-1"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
 type UpdateDeviceRequest struct {
 	Name     *string                `json:"name,omitempty" example:"Warehouse Temperature Sensor v2"`
-	Type     *string                `json:"type,omitempty" example:"temperature_sensor"`
-	Status   *string                `json:"status,omitempty" example:"maintenance"`
+	Type     *string                `json:"type,omitempty" enums:"temperature_sensor,humidity_sensor,smoke_detector,motion_sensor,door_sensor,camera,gateway,other" example:"temperature_sensor"`
+	Status   *string                `json:"status,omitempty" enums:"active,inactive,maintenance,error" example:"maintenance"`
 	Tags     []string               `json:"tags,omitempty" example:"warehouse,floor-1"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
