@@ -58,7 +58,8 @@ func (h *ingestHandler) Ingest(c *gin.Context) {
 // @Produce json
 // @Security DeviceAPIKey
 // @Param request body alert.BatchRequest true "Batch payload. events must contain 1..100 items. Partial failure is reported per index."
-// @Success 202 {object} alert.BatchEnvelopeResponse "Batch processed; check data.accepted, data.rejected, data.alerts, and data.errors."
+// @Success 202 {object} alert.BatchEnvelopeResponse "Batch fully accepted; check data.accepted, data.alerts, and data.errors."
+// @Success 207 {object} alert.BatchEnvelopeResponse "Batch partially accepted; check data.accepted, data.rejected, data.alerts, and data.errors."
 // @Failure 400 {object} common.ErrorResponse "Empty batch, more than 100 events, malformed JSON, or invalid batch shape."
 // @Failure 401 {object} common.ErrorResponse "Missing, invalid, or soft-deleted device API key."
 // @Failure 500 {object} common.ErrorResponse "Internal insert or notify error."
@@ -73,7 +74,11 @@ func (h *ingestHandler) IngestBatch(c *gin.Context) {
 		handleAlertError(c, err)
 		return
 	}
-	response.Success(c, http.StatusAccepted, "Batch processed", data)
+	status := http.StatusAccepted
+	if data.Accepted > 0 && data.Rejected > 0 {
+		status = http.StatusMultiStatus
+	}
+	response.Success(c, status, "Batch processed", data)
 }
 
 func currentDeviceID(c *gin.Context) uuid.UUID {

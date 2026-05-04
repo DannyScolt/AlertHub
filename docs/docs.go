@@ -987,7 +987,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "202": {
-                        "description": "Batch processed; check data.accepted, data.rejected, data.alerts, and data.errors.",
+                        "description": "Batch fully accepted; check data.accepted, data.alerts, and data.errors.",
+                        "schema": {
+                            "$ref": "#/definitions/alert.BatchEnvelopeResponse"
+                        }
+                    },
+                    "207": {
+                        "description": "Batch partially accepted; check data.accepted, data.rejected, data.alerts, and data.errors.",
                         "schema": {
                             "$ref": "#/definitions/alert.BatchEnvelopeResponse"
                         }
