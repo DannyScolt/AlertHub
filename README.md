@@ -312,6 +312,14 @@ Seed này sẽ bị skip khi `APP_ENV=production`.
 
 ---
 
+## Luồng Test Cho Reviewer
+
+Nếu muốn test end-to-end theo thứ tự Backlog 1 đến Backlog 5, dùng file:
+
+- [docs/reviewer-test-flow.md](docs/reviewer-test-flow.md) — flow test tổng từ auth/device/event/query/escalation/search.
+
+---
+
 ## Luồng Test Backlog 1 Cho Reviewer
 
 Chi tiết Backlog 1 đã được tách riêng để dễ đọc và test theo từng bước:
