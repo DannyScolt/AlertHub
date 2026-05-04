@@ -105,6 +105,72 @@ func TestListAlertsRejectsInvalidDeviceID(t *testing.T) {
 	}
 }
 
+func TestListAlertsTrimsSearchBeforePassingRepositoryFilter(t *testing.T) {
+	repo := &queryRepoStub{result: alertRepo.ListResult{Total: 0, Alerts: nil}}
+	service := newQueryService(repo)
+
+	_, err := service.ListAlerts(context.Background(), uuid.New(), ListAlertsInput{
+		Search:   ptr("  smoke alarm  "),
+		Page:     1,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if repo.calledFilter.Search == nil || *repo.calledFilter.Search != "smoke alarm" {
+		t.Fatalf("expected trimmed search %q, got %v", "smoke alarm", repo.calledFilter.Search)
+	}
+}
+
+func TestListAlertsIgnoresBlankSearch(t *testing.T) {
+	repo := &queryRepoStub{result: alertRepo.ListResult{Total: 0, Alerts: nil}}
+	service := newQueryService(repo)
+
+	_, err := service.ListAlerts(context.Background(), uuid.New(), ListAlertsInput{
+		Search:   ptr("   "),
+		Page:     1,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if repo.calledFilter.Search != nil {
+		t.Fatalf("expected nil search for blank value, got %v", repo.calledFilter.Search)
+	}
+}
+
+func TestListAlertsRejectsOneCharacterSearch(t *testing.T) {
+	repo := &queryRepoStub{}
+	service := newQueryService(repo)
+
+	_, err := service.ListAlerts(context.Background(), uuid.New(), ListAlertsInput{
+		Search:   ptr("a"),
+		Page:     1,
+		PageSize: 20,
+	})
+
+	if !errors.Is(err, ErrInvalidSearch) {
+		t.Fatalf("expected ErrInvalidSearch, got %v", err)
+	}
+}
+
+func TestListAlertsRejectsSearchLongerThan100Characters(t *testing.T) {
+	repo := &queryRepoStub{}
+	service := newQueryService(repo)
+
+	_, err := service.ListAlerts(context.Background(), uuid.New(), ListAlertsInput{
+		Search:   ptr("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		Page:     1,
+		PageSize: 20,
+	})
+
+	if !errors.Is(err, ErrInvalidSearch) {
+		t.Fatalf("expected ErrInvalidSearch, got %v", err)
+	}
+}
+
 func TestListAlertsScopesClientIDAndPassesFilter(t *testing.T) {
 	clientID := uuid.New()
 	deviceID := uuid.New()

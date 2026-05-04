@@ -1,6 +1,6 @@
 # Backlog 3 — Client xem và lọc danh sách cảnh báo
 
-Backlog 3 cho phép client truy vấn lịch sử alert đã được lưu (do device gửi qua Backlog 2), với các bộ lọc theo thiết bị, mức độ nghiêm trọng và khoảng thời gian.
+Backlog 3 cho phép client truy vấn lịch sử alert đã được lưu (do device gửi qua Backlog 2), với các bộ lọc theo thiết bị, mức độ nghiêm trọng và khoảng thời gian. Backlog 5 mở rộng cùng endpoint này bằng `search` nhưng giữ nguyên response shape và pagination.
 
 > Yêu cầu: Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian.
 
@@ -16,6 +16,7 @@ Backlog 3 cho phép client truy vấn lịch sử alert đã được lưu (do d
 | Filter theo `severity` đơn và đa giá trị | Hoàn thành |
 | Filter theo `from`/`to` (RFC3339) trên `occurred_at` | Hoàn thành |
 | Pagination `page`/`page_size` (default 20, max 100) | Hoàn thành |
+| Search theo message/type/tên device/exact device UUID qua Backlog 5 | Hoàn thành |
 | Order timeline mới nhất trước (`occurred_at DESC, id DESC`) | Hoàn thành |
 | Validation rõ ràng cho mọi tham số | Hoàn thành |
 | Không leak alert sang client khác | Hoàn thành |
@@ -33,6 +34,7 @@ Backlog 3 cho phép client truy vấn lịch sử alert đã được lưu (do d
 | Filter device đúng | `?device_id=...` chỉ trả alert của device đó |
 | Filter multi-severity đúng | `?severity=warning&severity=critical` chỉ trả 2 mức |
 | Filter time range đúng | `?from=...&to=...` chỉ trả alert trong khoảng |
+| Search compose đúng | `?search=smoke&severity=critical&device_id=...` chỉ trả alert match tất cả điều kiện |
 | Validation severity | severity ngoài enum → `400 INVALID_SEVERITY` |
 | Validation time | format sai → `400 INVALID_TIME_FORMAT`; from > to → `400 INVALID_TIME_RANGE` |
 | Validation pagination | `page < 1` hoặc `page_size > 100` → `400 INVALID_PAGINATION` |
@@ -47,7 +49,7 @@ Backlog 3 cho phép client truy vấn lịch sử alert đã được lưu (do d
 ```text
 Client (JWT)
   │  GET /api/v1/alerts?device_id=...&severity=warning
-  │       &from=...&to=...&page=1&page_size=20
+  │       &from=...&to=...&search=smoke&page=1&page_size=20
   │  Authorization: Bearer <access_token>
   ▼
 Auth middleware
@@ -57,12 +59,12 @@ QueryHandler.List
   │  parse query → ListAlertsInput
   ▼
 QueryService.ListAlerts
-  │  validate severity, time range, pagination, device_id
+  │  validate severity, time range, pagination, device_id, search
   │  build ListFilter
   ▼
 AlertRepository.List
   │  SELECT ... FROM alerts
-  │  WHERE client_id = $1 AND optional filters
+  │  WHERE client_id = $1 AND optional filters/search
   │  ORDER BY occurred_at DESC, id DESC
   │  LIMIT/OFFSET; + COUNT(*) cho total
   ▼
@@ -124,10 +126,11 @@ Tất cả tham số đều optional. Mặc định trả mọi alert thuộc cl
 | `severity` | enum, lặp được | `info`, `warning`, hoặc `critical`. Lặp để chọn nhiều mức: `?severity=warning&severity=critical` |
 | `from` | RFC3339 | Lower bound trên `occurred_at` (>=) |
 | `to` | RFC3339 | Upper bound trên `occurred_at` (<=) |
+| `search` | string 2..100 | Tìm case-insensitive trong message, type, tên device hoặc exact device UUID |
 | `page` | int >= 1 | Trang hiện tại, mặc định 1 |
 | `page_size` | int 1..100 | Kích thước trang, mặc định 20 |
 
-`from`/`to` dùng `occurred_at` (thời điểm event xảy ra ở device), không dùng `received_at`.
+`from`/`to` dùng `occurred_at` (thời điểm event xảy ra ở device), không dùng `received_at`. `search` là phần mở rộng của Backlog 5: blank sau khi trim sẽ bị bỏ qua, còn search 1 ký tự hoặc trên 100 ký tự trả `400 INVALID_SEARCH`.
 
 ---
 

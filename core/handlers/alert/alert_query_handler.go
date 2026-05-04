@@ -26,7 +26,7 @@ func NewQueryHandler(service alertService.QueryService) QueryHandler {
 
 // List godoc
 // @Summary List alerts for the authenticated client
-// @Description Returns paginated alerts owned by the authenticated client (Backlog 3). Filter by `device_id`, one or more `severity` values (`info`, `warning`, `critical`), and a time range on `occurred_at` using `from` and `to` in RFC3339. Results are scoped to the current client and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id` or any device API key material.
+// @Description Returns paginated alerts owned by the authenticated client. Filter by `device_id`, one or more `severity` values (`info`, `warning`, `critical`), a time range on `occurred_at`, and `search` over alert message, alert type, device name, or exact device UUID. Results are scoped to the current client and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id` or any device API key material.
 // @Tags Alerts
 // @Produce json
 // @Security BearerAuth
@@ -34,6 +34,7 @@ func NewQueryHandler(service alertService.QueryService) QueryHandler {
 // @Param severity query []string false "Filter by severity. Repeat to combine, e.g. severity=warning&severity=critical" Enums(info,warning,critical) collectionFormat(multi)
 // @Param from query string false "Inclusive lower bound on occurred_at, RFC3339" example(2026-05-01T00:00:00Z)
 // @Param to query string false "Inclusive upper bound on occurred_at, RFC3339" example(2026-05-04T23:59:59Z)
+// @Param search query string false "Search alert message, alert type, device name, or exact device UUID" minlength(2) maxlength(100) example(smoke)
 // @Param page query int false "Page number, starts at 1" minimum(1) default(1)
 // @Param page_size query int false "Items per page" minimum(1) maximum(100) default(20)
 // @Success 200 {object} alert.ListAlertsResponse "Alerts retrieved successfully with pagination metadata."
@@ -69,6 +70,7 @@ func listAlertsInput(c *gin.Context) (alertService.ListAlertsInput, error) {
 		Severities: c.QueryArray("severity"),
 		From:       optionalQuery(c, "from"),
 		To:         optionalQuery(c, "to"),
+		Search:     optionalQuery(c, "search"),
 		Page:       page,
 		PageSize:   pageSize,
 	}, nil
@@ -123,6 +125,8 @@ func handleAlertQueryError(c *gin.Context, err error) {
 		response.Error(c, http.StatusBadRequest, "INVALID_TIME_RANGE", err.Error(), nil)
 	case errors.Is(err, alertService.ErrInvalidPagination):
 		response.Error(c, http.StatusBadRequest, "INVALID_PAGINATION", err.Error(), nil)
+	case errors.Is(err, alertService.ErrInvalidSearch):
+		response.Error(c, http.StatusBadRequest, "INVALID_SEARCH", err.Error(), nil)
 	default:
 		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error(), nil)
 	}

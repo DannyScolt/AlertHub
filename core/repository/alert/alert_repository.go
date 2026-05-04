@@ -24,6 +24,7 @@ type ListFilter struct {
 	Severities []domain.Severity
 	From       *time.Time
 	To         *time.Time
+	Search     *string
 	Page       int
 	PageSize   int
 	Offset     int
@@ -68,12 +69,50 @@ type alertRepository struct{ db *pgxpool.Pool }
 func NewAlertRepository(db *pgxpool.Pool) AlertRepository { return &alertRepository{db: db} }
 
 const alertColumns = `id, device_id, client_id, type, severity, message, payload, occurred_at, received_at, created_at`
+const qualifiedAlertColumns = `alerts.id, alerts.device_id, alerts.client_id, alerts.type, alerts.severity, alerts.message, alerts.payload, alerts.occurred_at, alerts.received_at, alerts.created_at`
 
-const alertListWhere = `WHERE client_id = $1
-  AND ($2::uuid IS NULL OR device_id = $2)
-  AND ($3::alert_severity[] IS NULL OR severity = ANY($3::alert_severity[]))
-  AND ($4::timestamptz IS NULL OR occurred_at >= $4)
-  AND ($5::timestamptz IS NULL OR occurred_at <= $5)`
+type alertListQueries struct {
+	List  string
+	Count string
+}
+
+func buildAlertListQueries(filter ListFilter) alertListQueries {
+	from := "alerts"
+	where := `WHERE alerts.client_id = $1
+  AND ($2::uuid IS NULL OR alerts.device_id = $2)
+  AND ($3::alert_severity[] IS NULL OR alerts.severity = ANY($3::alert_severity[]))
+  AND ($4::timestamptz IS NULL OR alerts.occurred_at >= $4)
+  AND ($5::timestamptz IS NULL OR alerts.occurred_at <= $5)`
+	hasSearchDeviceID := false
+	if filter.Search != nil {
+		from = "alerts JOIN devices ON devices.id = alerts.device_id AND devices.client_id = $1"
+		where += `
+  AND (alerts.message ILIKE $6 OR alerts.type ILIKE $6 OR devices.name ILIKE $6`
+		if _, err := uuid.Parse(*filter.Search); err == nil {
+			hasSearchDeviceID = true
+			where += ` OR alerts.device_id = $7`
+		}
+		where += `)`
+	}
+	limitPlaceholder := "$6"
+	offsetPlaceholder := "$7"
+	if filter.Search != nil {
+		limitPlaceholder = "$7"
+		offsetPlaceholder = "$8"
+	}
+	if hasSearchDeviceID {
+		limitPlaceholder = "$8"
+		offsetPlaceholder = "$9"
+	}
+	return alertListQueries{
+		List: `SELECT ` + qualifiedAlertColumns + ` FROM ` + from + `
+` + where + `
+ORDER BY alerts.occurred_at DESC, alerts.id DESC
+LIMIT ` + limitPlaceholder + ` OFFSET ` + offsetPlaceholder,
+		Count: `SELECT COUNT(*) FROM ` + from + `
+` + where,
+	}
+}
 
 func scanAlert(row pgx.Row, a *domain.Alert) error {
 	return row.Scan(&a.ID, &a.DeviceID, &a.ClientID, &a.Type, &a.Severity, &a.Message, &a.Payload, &a.OccurredAt, &a.ReceivedAt, &a.CreatedAt)
@@ -128,13 +167,10 @@ func (r *alertRepository) FindByID(ctx context.Context, alertID uuid.UUID) (doma
 
 func (r *alertRepository) List(ctx context.Context, clientID uuid.UUID, filter ListFilter) (ListResult, error) {
 	severities := severityStrings(filter.Severities)
+	queries := buildAlertListQueries(filter)
+	args := alertListArgs(clientID, filter, severities)
 
-	const listQuery = `SELECT ` + alertColumns + ` FROM alerts
-` + alertListWhere + `
-ORDER BY occurred_at DESC, id DESC
-LIMIT $6 OFFSET $7`
-
-	rows, err := r.db.Query(ctx, listQuery, clientID, filter.DeviceID, severities, filter.From, filter.To, filter.PageSize, filter.Offset)
+	rows, err := r.db.Query(ctx, queries.List, append(args, filter.PageSize, filter.Offset)...)
 	if err != nil {
 		return ListResult{}, mapPgError(err)
 	}
@@ -152,14 +188,24 @@ LIMIT $6 OFFSET $7`
 		return ListResult{}, mapPgError(err)
 	}
 
-	const countQuery = `SELECT COUNT(*) FROM alerts
-` + alertListWhere
-
 	var total int64
-	if err := r.db.QueryRow(ctx, countQuery, clientID, filter.DeviceID, severities, filter.From, filter.To).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, queries.Count, args...).Scan(&total); err != nil {
 		return ListResult{}, mapPgError(err)
 	}
 	return ListResult{Alerts: alerts, Total: total}, nil
+}
+
+func alertListArgs(clientID uuid.UUID, filter ListFilter, severities []string) []any {
+	args := []any{clientID, filter.DeviceID, severities, filter.From, filter.To}
+	if filter.Search == nil {
+		return args
+	}
+	searchPattern := "%" + *filter.Search + "%"
+	args = append(args, searchPattern)
+	if searchDeviceID, err := uuid.Parse(*filter.Search); err == nil {
+		args = append(args, searchDeviceID)
+	}
+	return args
 }
 
 func severityStrings(severities []domain.Severity) []string {

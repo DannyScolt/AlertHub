@@ -3,6 +3,7 @@ package alert
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	domain "alerthub/core/domain/alert"
@@ -17,6 +18,7 @@ var (
 	ErrInvalidTimeFormat = errors.New("invalid time format")
 	ErrInvalidTimeRange  = errors.New("invalid time range")
 	ErrInvalidPagination = errors.New("invalid pagination")
+	ErrInvalidSearch     = errors.New("invalid search")
 )
 
 type ListAlertsInput struct {
@@ -24,6 +26,7 @@ type ListAlertsInput struct {
 	Severities []string
 	From       *string
 	To         *string
+	Search     *string
 	Page       int
 	PageSize   int
 }
@@ -75,11 +78,17 @@ func (s *queryService) ListAlerts(ctx context.Context, clientID uuid.UUID, input
 		return ListAlertsOutput{}, ErrInvalidTimeRange
 	}
 
+	search, err := normalizeSearch(input.Search)
+	if err != nil {
+		return ListAlertsOutput{}, err
+	}
+
 	result, err := s.repo.List(ctx, clientID, alertRepo.ListFilter{
 		DeviceID:   deviceID,
 		Severities: severities,
 		From:       from,
 		To:         to,
+		Search:     search,
 		Page:       page,
 		PageSize:   pageSize,
 		Offset:     pagination.Offset(page, pageSize),
@@ -152,4 +161,18 @@ func parseOptionalTime(raw *string) (*time.Time, error) {
 		return nil, ErrInvalidTimeFormat
 	}
 	return &t, nil
+}
+
+func normalizeSearch(raw *string) (*string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	search := strings.TrimSpace(*raw)
+	if search == "" {
+		return nil, nil
+	}
+	if len(search) < 2 || len(search) > 100 {
+		return nil, ErrInvalidSearch
+	}
+	return &search, nil
 }

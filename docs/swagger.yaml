@@ -557,11 +557,12 @@ info:
 paths:
   /alerts:
     get:
-      description: Returns paginated alerts owned by the authenticated client (Backlog
-        3). Filter by `device_id`, one or more `severity` values (`info`, `warning`,
-        `critical`), and a time range on `occurred_at` using `from` and `to` in RFC3339.
-        Results are scoped to the current client and ordered by `occurred_at DESC,
-        id DESC`. The response never includes `client_id` or any device API key material.
+      description: Returns paginated alerts owned by the authenticated client. Filter
+        by `device_id`, one or more `severity` values (`info`, `warning`, `critical`),
+        a time range on `occurred_at`, and `search` over alert message, alert type,
+        device name, or exact device UUID. Results are scoped to the current client
+        and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id`
+        or any device API key material.
       parameters:
       - description: Filter to a single device id (UUID)
         example: 4d285f4b-2a87-4a86-a5b8-05b09c6d1234
@@ -588,6 +589,14 @@ paths:
         example: "2026-05-04T23:59:59Z"
         in: query
         name: to
+        type: string
+      - description: Search alert message, alert type, device name, or exact device
+          UUID
+        example: smoke
+        in: query
+        maxLength: 100
+        minLength: 2
+        name: search
         type: string
       - default: 1
         description: Page number, starts at 1

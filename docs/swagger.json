@@ -15,7 +15,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns paginated alerts owned by the authenticated client (Backlog 3). Filter by `device_id`, one or more `severity` values (`info`, `warning`, `critical`), and a time range on `occurred_at` using `from` and `to` in RFC3339. Results are scoped to the current client and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id` or any device API key material.",
+                "description": "Returns paginated alerts owned by the authenticated client. Filter by `device_id`, one or more `severity` values (`info`, `warning`, `critical`), a time range on `occurred_at`, and `search` over alert message, alert type, device name, or exact device UUID. Results are scoped to the current client and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id` or any device API key material.",
                 "produces": [
                     "application/json"
                 ],
@@ -58,6 +58,15 @@
                         "example": "2026-05-04T23:59:59Z",
                         "description": "Inclusive upper bound on occurred_at, RFC3339",
                         "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "maxLength": 100,
+                        "minLength": 2,
+                        "type": "string",
+                        "example": "smoke",
+                        "description": "Search alert message, alert type, device name, or exact device UUID",
+                        "name": "search",
                         "in": "query"
                     },
                     {
