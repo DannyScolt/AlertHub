@@ -34,14 +34,14 @@ Project có đầy đủ authentication cho client, device API key auth, alert i
 
 | Phần | Thời gian ước tính |
 | --- | --- |
-| Backlog 1 — Auth, device registration, device list/filter | 8 giờ |
-| Backlog 2 — Alert ingest, batch ingest, SSE realtime stream | 8 giờ |
-| Backlog 3 — Alert query/filter/pagination và chuẩn hóa query structure | 6 giờ |
-| Backlog 4 — Auto-escalation, Redis cooldown, listener và smoke tests | 6 giờ |
-| Backlog 5 — Alert search, indexes, docs và Swagger | 4 giờ |
-| Refactor theo SOLID, verification, reviewer docs | 6 giờ |
+| Backlog 1 — Auth, device registration, device list/filter | 5 giờ |
+| Backlog 2 — Alert ingest, batch ingest, SSE realtime stream | 5 giờ |
+| Backlog 3 — Alert query/filter/pagination và chuẩn hóa query structure | 4 giờ |
+| Backlog 4 — Auto-escalation, Redis cooldown, listener và smoke tests | 4 giờ |
+| Backlog 5 — Alert search, indexes, docs và Swagger | 3 giờ |
+| Refactor theo SOLID, verification, reviewer docs | 3 giờ |
 
-Tổng thời gian ước tính: khoảng 38 giờ.
+Tổng thời gian ước tính: khoảng 24 giờ.
 
 ---
 
