@@ -74,15 +74,12 @@ func (h *deviceHandler) Create(c *gin.Context) {
 // @Failure 401 {object} common.ErrorResponse "Missing or invalid access token."
 // @Router /devices [get]
 func (h *deviceHandler) List(c *gin.Context) {
-	status := optionalQuery(c, "status")
-	deviceType := optionalQuery(c, "type")
-	out, err := h.service.ListDevices(c.Request.Context(), currentClientID(c), deviceService.ListDevicesInput{
-		Status:         status,
-		Type:           deviceType,
-		IncludeDeleted: c.Query("include_deleted") == "true",
-		Page:           queryInt(c, "page", pagination.DefaultPage),
-		PageSize:       queryInt(c, "page_size", pagination.DefaultPageSize),
-	})
+	input, err := listDevicesInput(c)
+	if err != nil {
+		handleDeviceError(c, err)
+		return
+	}
+	out, err := h.service.ListDevices(c.Request.Context(), currentClientID(c), input)
 	if err != nil {
 		handleDeviceError(c, err)
 		return
@@ -252,18 +249,42 @@ func optionalQuery(c *gin.Context, key string) *string {
 	return &value
 }
 
-func queryInt(c *gin.Context, key string, fallback int) int {
-	value, err := strconv.Atoi(c.Query(key))
-	if err != nil || value <= 0 {
-		return fallback
+func listDevicesInput(c *gin.Context) (deviceService.ListDevicesInput, error) {
+	page, err := queryInt(c, "page", pagination.DefaultPage)
+	if err != nil {
+		return deviceService.ListDevicesInput{}, err
 	}
-	return value
+	pageSize, err := queryInt(c, "page_size", pagination.DefaultPageSize)
+	if err != nil {
+		return deviceService.ListDevicesInput{}, err
+	}
+	return deviceService.ListDevicesInput{
+		Status:         optionalQuery(c, "status"),
+		Type:           optionalQuery(c, "type"),
+		IncludeDeleted: c.Query("include_deleted") == "true",
+		Page:           page,
+		PageSize:       pageSize,
+	}, nil
+}
+
+func queryInt(c *gin.Context, key string, fallback int) (int, error) {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, deviceService.ErrInvalidPagination
+	}
+	return value, nil
 }
 
 func handleDeviceError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, deviceService.ErrInvalidDeviceType), errors.Is(err, deviceService.ErrInvalidDeviceStatus):
 		response.Error(c, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), nil)
+	case errors.Is(err, deviceService.ErrInvalidPagination):
+		response.Error(c, http.StatusBadRequest, "INVALID_PAGINATION", "Invalid pagination parameters", nil)
 	case errors.Is(err, deviceRepo.ErrDeviceNameConflict):
 		response.Error(c, http.StatusConflict, "DEVICE_NAME_CONFLICT", "Device name already exists", nil)
 	case errors.Is(err, deviceRepo.ErrDeviceNotFound):

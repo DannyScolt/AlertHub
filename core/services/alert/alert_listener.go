@@ -20,7 +20,7 @@ type AlertDispatcher interface {
 
 type AlertListener struct {
 	db         *pgxpool.Pool
-	repo       alertRepo.AlertRepository
+	repo       alertRepo.LookupRepository
 	dispatcher AlertDispatcher
 	channel    string
 }
@@ -30,7 +30,7 @@ type alertNotificationPayload struct {
 	AlertID  string `json:"alert_id"`
 }
 
-func NewAlertListener(db *pgxpool.Pool, repo alertRepo.AlertRepository, dispatcher AlertDispatcher) *AlertListener {
+func NewAlertListener(db *pgxpool.Pool, repo alertRepo.LookupRepository, dispatcher AlertDispatcher) *AlertListener {
 	return &AlertListener{db: db, repo: repo, dispatcher: dispatcher, channel: alertRepo.ChannelAlertCreated}
 }
 

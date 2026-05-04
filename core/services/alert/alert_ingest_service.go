@@ -27,11 +27,11 @@ type IngestService interface {
 }
 
 type ingestService struct {
-	repo     alertRepo.AlertRepository
+	repo     alertRepo.IngestRepository
 	notifier alertRepo.Notifier
 }
 
-func NewIngestService(repo alertRepo.AlertRepository, notifier alertRepo.Notifier) IngestService {
+func NewIngestService(repo alertRepo.IngestRepository, notifier alertRepo.Notifier) IngestService {
 	return &ingestService{repo: repo, notifier: notifier}
 }
 

@@ -17,7 +17,9 @@ func SetupAlertRoutes(router *gin.Engine, cfg *config.Config, db *pgxpool.Pool, 
 	alertNotifier := alertRepo.NewNotifier(db)
 	deviceRepository := deviceRepo.NewDeviceRepository(db)
 	ingestService := alertService.NewIngestService(alertRepository, alertNotifier)
+	queryService := alertService.NewQueryService(alertRepository)
 	ingestHandler := alertHandler.NewIngestHandler(ingestService)
+	queryHandler := alertHandler.NewQueryHandler(queryService)
 	streamHandler := alertHandler.NewStreamHandler(streamService)
 
 	events := router.Group("/api/v1/events")
@@ -27,5 +29,6 @@ func SetupAlertRoutes(router *gin.Engine, cfg *config.Config, db *pgxpool.Pool, 
 
 	alerts := router.Group("/api/v1/alerts")
 	alerts.Use(middleware.Auth(cfg))
+	alerts.GET("", queryHandler.List)
 	alerts.GET("/stream", streamHandler.Stream)
 }

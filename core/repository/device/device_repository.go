@@ -34,16 +34,41 @@ type ListResult struct {
 	Total   int64
 }
 
-type DeviceRepository interface {
+type CreateRepository interface {
 	Create(ctx context.Context, device domain.Device) (domain.Device, error)
+	ExistsActiveName(ctx context.Context, clientID uuid.UUID, name string, excludeDeviceID *uuid.UUID) (bool, error)
+}
+
+type QueryRepository interface {
 	FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error)
-	FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error)
 	List(ctx context.Context, clientID uuid.UUID, filter ListFilter) (ListResult, error)
+}
+
+type UpdateRepository interface {
+	FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error)
 	Update(ctx context.Context, device domain.Device) (domain.Device, error)
+	ExistsActiveName(ctx context.Context, clientID uuid.UUID, name string, excludeDeviceID *uuid.UUID) (bool, error)
+}
+
+type LifecycleRepository interface {
+	FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error)
 	SoftDelete(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error)
 	Restore(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error)
-	UpdateAPIKeyHash(ctx context.Context, clientID, deviceID uuid.UUID, apiKeyHash string) error
 	ExistsActiveName(ctx context.Context, clientID uuid.UUID, name string, excludeDeviceID *uuid.UUID) (bool, error)
+}
+
+type CredentialRepository interface {
+	FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error)
+	FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error)
+	UpdateAPIKeyHash(ctx context.Context, clientID, deviceID uuid.UUID, apiKeyHash string) error
+}
+
+type DeviceRepository interface {
+	CreateRepository
+	QueryRepository
+	UpdateRepository
+	LifecycleRepository
+	CredentialRepository
 }
 
 type deviceRepository struct{ db *pgxpool.Pool }

@@ -15,16 +15,28 @@ import (
 
 var ErrClientTokenNotFound = errors.New("client token not found")
 
-type ClientTokenRepository interface {
+type IssueRepository interface {
 	Create(ctx context.Context, token domain.ClientToken) (domain.ClientToken, error)
+}
+
+type RefreshRepository interface {
+	IssueRepository
 	FindByHash(ctx context.Context, tokenHash string) (domain.ClientToken, error)
 	MarkUsed(ctx context.Context, id uuid.UUID) error
 	SetReplacedBy(ctx context.Context, id uuid.UUID, replacedByID uuid.UUID) error
-	Revoke(ctx context.Context, id uuid.UUID, reason string) error
-	RevokeByClientID(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID, reason string) error
 	RevokeFamily(ctx context.Context, tokenFamily uuid.UUID, reason string) error
+}
+
+type SessionRepository interface {
+	RevokeByClientID(ctx context.Context, clientID uuid.UUID, sessionID uuid.UUID, reason string) error
 	RevokeAllByClientID(ctx context.Context, clientID uuid.UUID, reason string) error
 	ListByClientID(ctx context.Context, clientID uuid.UUID) ([]domain.ClientToken, error)
+}
+
+type ClientTokenRepository interface {
+	RefreshRepository
+	SessionRepository
+	Revoke(ctx context.Context, id uuid.UUID, reason string) error
 }
 
 type clientTokenRepository struct{ db *pgxpool.Pool }

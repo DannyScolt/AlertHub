@@ -7,7 +7,6 @@ import (
 
 	domain "alerthub/core/domain/alert"
 	alertDto "alerthub/core/dto/alert"
-
 	"github.com/google/uuid"
 )
 
@@ -29,14 +28,6 @@ func (r *batchAlertRepoStub) CreateBatch(ctx context.Context, alerts []domain.Al
 		saved = append(saved, alert)
 	}
 	return saved, nil
-}
-
-func (r *batchAlertRepoStub) FindByID(ctx context.Context, alertID uuid.UUID) (domain.Alert, error) {
-	return domain.Alert{}, nil
-}
-
-func (r *batchAlertRepoStub) LatestOccurredAtByDeviceID(ctx context.Context, deviceID uuid.UUID) (*time.Time, error) {
-	return nil, nil
 }
 
 func TestIngestBatchAcceptsAllValidEvents(t *testing.T) {

@@ -20,6 +20,7 @@ import (
 var (
 	ErrInvalidDeviceType    = errors.New("invalid device type")
 	ErrInvalidDeviceStatus  = errors.New("invalid device status")
+	ErrInvalidPagination    = errors.New("invalid pagination")
 	ErrDeviceDeleted        = errors.New("device deleted")
 	ErrDeviceNotDeleted     = errors.New("device is not deleted")
 	ErrRestoreWindowExpired = errors.New("device restore window expired")
@@ -51,13 +52,21 @@ type DeviceService interface {
 }
 
 type deviceService struct {
-	cfg       *config.Config
-	repo      deviceRepo.DeviceRepository
-	alertRepo alertRepo.AlertRepository
+	cfg            *config.Config
+	createRepo     deviceRepo.CreateRepository
+	queryRepo      deviceRepo.QueryRepository
+	updateRepo     deviceRepo.UpdateRepository
+	lifecycleRepo  deviceRepo.LifecycleRepository
+	credentialRepo deviceRepo.CredentialRepository
+	alertRepo      alertRepo.DeviceActivityRepository
 }
 
-func NewDeviceService(cfg *config.Config, repo deviceRepo.DeviceRepository, alerts alertRepo.AlertRepository) DeviceService {
-	return &deviceService{cfg: cfg, repo: repo, alertRepo: alerts}
+func NewDeviceService(cfg *config.Config, repo deviceRepo.DeviceRepository, alerts alertRepo.DeviceActivityRepository) DeviceService {
+	return NewFocusedDeviceService(cfg, repo, repo, repo, repo, repo, alerts)
+}
+
+func NewFocusedDeviceService(cfg *config.Config, createRepo deviceRepo.CreateRepository, queryRepo deviceRepo.QueryRepository, updateRepo deviceRepo.UpdateRepository, lifecycleRepo deviceRepo.LifecycleRepository, credentialRepo deviceRepo.CredentialRepository, alerts alertRepo.DeviceActivityRepository) DeviceService {
+	return &deviceService{cfg: cfg, createRepo: createRepo, queryRepo: queryRepo, updateRepo: updateRepo, lifecycleRepo: lifecycleRepo, credentialRepo: credentialRepo, alertRepo: alerts}
 }
 
 func (s *deviceService) CreateDevice(ctx context.Context, clientID uuid.UUID, req deviceDto.CreateDeviceRequest) (deviceDto.DeviceWithAPIKeyResponse, error) {
@@ -72,7 +81,7 @@ func (s *deviceService) CreateDevice(ctx context.Context, clientID uuid.UUID, re
 			return deviceDto.DeviceWithAPIKeyResponse{}, ErrInvalidDeviceStatus
 		}
 	}
-	exists, err := s.repo.ExistsActiveName(ctx, clientID, req.Name, nil)
+	exists, err := s.createRepo.ExistsActiveName(ctx, clientID, req.Name, nil)
 	if err != nil {
 		return deviceDto.DeviceWithAPIKeyResponse{}, err
 	}
@@ -91,7 +100,7 @@ func (s *deviceService) CreateDevice(ctx context.Context, clientID uuid.UUID, re
 	if metadata == nil {
 		metadata = map[string]interface{}{}
 	}
-	created, err := s.repo.Create(ctx, domain.Device{ClientID: clientID, Name: req.Name, Type: dType, Status: status, Tags: tags, Metadata: metadata, APIKeyHash: apikey.Hash(rawKey)})
+	created, err := s.createRepo.Create(ctx, domain.Device{ClientID: clientID, Name: req.Name, Type: dType, Status: status, Tags: tags, Metadata: metadata, APIKeyHash: apikey.Hash(rawKey)})
 	if err != nil {
 		return deviceDto.DeviceWithAPIKeyResponse{}, err
 	}
@@ -99,7 +108,10 @@ func (s *deviceService) CreateDevice(ctx context.Context, clientID uuid.UUID, re
 }
 
 func (s *deviceService) ListDevices(ctx context.Context, clientID uuid.UUID, input ListDevicesInput) (ListDevicesOutput, error) {
-	page, pageSize := pagination.Normalize(input.Page, input.PageSize)
+	if input.Page < 1 || input.PageSize < 1 || input.PageSize > pagination.MaxPageSize {
+		return ListDevicesOutput{}, ErrInvalidPagination
+	}
+	page, pageSize := input.Page, input.PageSize
 	filter := deviceRepo.ListFilter{IncludeDeleted: input.IncludeDeleted, Page: page, PageSize: pageSize, Offset: pagination.Offset(page, pageSize)}
 	if input.Status != nil && *input.Status != "" {
 		status := domain.DeviceStatus(*input.Status)
@@ -115,7 +127,7 @@ func (s *deviceService) ListDevices(ctx context.Context, clientID uuid.UUID, inp
 		}
 		filter.Type = &dType
 	}
-	result, err := s.repo.List(ctx, clientID, filter)
+	result, err := s.queryRepo.List(ctx, clientID, filter)
 	if err != nil {
 		return ListDevicesOutput{}, err
 	}
@@ -131,7 +143,7 @@ func (s *deviceService) ListDevices(ctx context.Context, clientID uuid.UUID, inp
 }
 
 func (s *deviceService) GetDevice(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.DeviceResponse, error) {
-	d, err := s.repo.FindByID(ctx, clientID, deviceID, false)
+	d, err := s.queryRepo.FindByID(ctx, clientID, deviceID, false)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
@@ -139,7 +151,7 @@ func (s *deviceService) GetDevice(ctx context.Context, clientID, deviceID uuid.U
 }
 
 func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uuid.UUID, req deviceDto.UpdateDeviceRequest) (deviceDto.DeviceResponse, error) {
-	d, err := s.repo.FindByID(ctx, clientID, deviceID, true)
+	d, err := s.updateRepo.FindByID(ctx, clientID, deviceID, true)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
@@ -147,7 +159,7 @@ func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uui
 		return deviceDto.DeviceResponse{}, ErrDeviceDeleted
 	}
 	if req.Name != nil {
-		exists, err := s.repo.ExistsActiveName(ctx, clientID, *req.Name, &deviceID)
+		exists, err := s.updateRepo.ExistsActiveName(ctx, clientID, *req.Name, &deviceID)
 		if err != nil {
 			return deviceDto.DeviceResponse{}, err
 		}
@@ -176,7 +188,7 @@ func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uui
 	if req.Metadata != nil {
 		d.Metadata = req.Metadata
 	}
-	updated, err := s.repo.Update(ctx, d)
+	updated, err := s.updateRepo.Update(ctx, d)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
@@ -184,7 +196,7 @@ func (s *deviceService) UpdateDevice(ctx context.Context, clientID, deviceID uui
 }
 
 func (s *deviceService) DeleteDevice(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.DeleteDeviceResponse, error) {
-	d, err := s.repo.SoftDelete(ctx, clientID, deviceID)
+	d, err := s.lifecycleRepo.SoftDelete(ctx, clientID, deviceID)
 	if err != nil {
 		return deviceDto.DeleteDeviceResponse{}, err
 	}
@@ -192,7 +204,7 @@ func (s *deviceService) DeleteDevice(ctx context.Context, clientID, deviceID uui
 }
 
 func (s *deviceService) RestoreDevice(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.DeviceResponse, error) {
-	d, err := s.repo.FindByID(ctx, clientID, deviceID, true)
+	d, err := s.lifecycleRepo.FindByID(ctx, clientID, deviceID, true)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
@@ -202,14 +214,14 @@ func (s *deviceService) RestoreDevice(ctx context.Context, clientID, deviceID uu
 	if time.Since(*d.DeletedAt) > time.Duration(s.cfg.DeviceRestoreWindowDays)*24*time.Hour {
 		return deviceDto.DeviceResponse{}, ErrRestoreWindowExpired
 	}
-	exists, err := s.repo.ExistsActiveName(ctx, clientID, d.Name, &deviceID)
+	exists, err := s.lifecycleRepo.ExistsActiveName(ctx, clientID, d.Name, &deviceID)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
 	if exists {
 		return deviceDto.DeviceResponse{}, deviceRepo.ErrDeviceNameConflict
 	}
-	restored, err := s.repo.Restore(ctx, clientID, deviceID)
+	restored, err := s.lifecycleRepo.Restore(ctx, clientID, deviceID)
 	if err != nil {
 		return deviceDto.DeviceResponse{}, err
 	}
@@ -217,7 +229,7 @@ func (s *deviceService) RestoreDevice(ctx context.Context, clientID, deviceID uu
 }
 
 func (s *deviceService) RotateAPIKey(ctx context.Context, clientID, deviceID uuid.UUID) (deviceDto.RotateDeviceAPIKeyResponse, error) {
-	d, err := s.repo.FindByID(ctx, clientID, deviceID, true)
+	d, err := s.credentialRepo.FindByID(ctx, clientID, deviceID, true)
 	if err != nil {
 		return deviceDto.RotateDeviceAPIKeyResponse{}, err
 	}
@@ -228,7 +240,7 @@ func (s *deviceService) RotateAPIKey(ctx context.Context, clientID, deviceID uui
 	if err != nil {
 		return deviceDto.RotateDeviceAPIKeyResponse{}, err
 	}
-	if err := s.repo.UpdateAPIKeyHash(ctx, clientID, deviceID, apikey.Hash(rawKey)); err != nil {
+	if err := s.credentialRepo.UpdateAPIKeyHash(ctx, clientID, deviceID, apikey.Hash(rawKey)); err != nil {
 		return deviceDto.RotateDeviceAPIKeyResponse{}, err
 	}
 	return deviceDto.RotateDeviceAPIKeyResponse{ID: deviceID.String(), APIKey: rawKey, RotatedAt: time.Now()}, nil

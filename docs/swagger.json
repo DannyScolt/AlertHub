@@ -8,6 +8,98 @@
     },
     "basePath": "/api/v1",
     "paths": {
+        "/alerts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns paginated alerts owned by the authenticated client (Backlog 3). Filter by `device_id`, one or more `severity` values (`info`, `warning`, `critical`), and a time range on `occurred_at` using `from` and `to` in RFC3339. Results are scoped to the current client and ordered by `occurred_at DESC, id DESC`. The response never includes `client_id` or any device API key material.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Alerts"
+                ],
+                "summary": "List alerts for the authenticated client",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234",
+                        "description": "Filter to a single device id (UUID)",
+                        "name": "device_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "enum": [
+                                "info",
+                                "warning",
+                                "critical"
+                            ],
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Filter by severity. Repeat to combine, e.g. severity=warning\u0026severity=critical",
+                        "name": "severity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-05-01T00:00:00Z",
+                        "description": "Inclusive lower bound on occurred_at, RFC3339",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-05-04T23:59:59Z",
+                        "description": "Inclusive upper bound on occurred_at, RFC3339",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number, starts at 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Alerts retrieved successfully with pagination metadata.",
+                        "schema": {
+                            "$ref": "#/definitions/alert.ListAlertsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error on filters or pagination.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid access token.",
+                        "schema": {
+                            "$ref": "#/definitions/common.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/alerts/stream": {
             "get": {
                 "security": [
@@ -935,6 +1027,70 @@
         }
     },
     "definitions": {
+        "alert.AlertPaginationMeta": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "has_previous": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 5
+                }
+            }
+        },
+        "alert.AlertResponse": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string",
+                    "example": "4d285f4b-2a87-4a86-a5b8-05b09c6d1234"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "9f3d2e1a-1234-4321-abcd-1234567890ab"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Temperature exceeded 80°C"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "received_at": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string",
+                    "example": "warning"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "high_temperature"
+                }
+            }
+        },
         "alert.BatchAcceptedAlert": {
             "type": "object",
             "properties": {
@@ -1076,6 +1232,28 @@
                 "received_at": {
                     "type": "string",
                     "example": "2026-05-03T12:00:00.123Z"
+                }
+            }
+        },
+        "alert.ListAlertsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/alert.AlertResponse"
+                    }
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Alerts retrieved successfully"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/alert.AlertPaginationMeta"
+                },
+                "status": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },

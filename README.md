@@ -1,12 +1,14 @@
 # AlertHub API
 
-AlertHub là REST API viết bằng Go cho bài **Backend Coding Challenge**. Bài nộp này đã triển khai Backlog 1 và Backlog 2:
+AlertHub là REST API viết bằng Go cho bài **Backend Coding Challenge**. Bài nộp này đã triển khai Backlog 1, Backlog 2 và Backlog 3:
 
 > Backlog 1: Là một client, tôi có thể đăng ký thiết bị mới vào hệ thống và truy vấn danh sách thiết bị theo trạng thái.
 >
 > Backlog 2: Thiết bị gửi event cảnh báo realtime lên hệ thống.
+>
+> Backlog 3: Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian.
 
-Project có đầy đủ authentication cho client, device API key auth, alert ingestion, realtime SSE stream, PostgreSQL storage, Swagger documentation, Docker local development và cấu trúc code theo từng layer để reviewer có thể chạy/test nhanh.
+Project có đầy đủ authentication cho client, device API key auth, alert ingestion, realtime SSE stream, alert query API với filter và pagination, PostgreSQL storage, Swagger documentation, Docker local development và cấu trúc code theo từng layer để reviewer có thể chạy/test nhanh.
 
 ---
 
@@ -18,6 +20,7 @@ Project có đầy đủ authentication cho client, device API key auth, alert i
 | --- | --- | --- |
 | 1 | Client có thể đăng ký thiết bị mới và xem danh sách thiết bị theo trạng thái | Hoàn thành |
 | 2 | Thiết bị gửi event cảnh báo realtime lên hệ thống | Hoàn thành |
+| 3 | Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian | Hoàn thành |
 
 ### Chưa triển khai
 
@@ -25,7 +28,6 @@ Các backlog bên dưới nằm ngoài phạm vi hiện tại:
 
 | Backlog | Yêu cầu | Trạng thái |
 | --- | --- | --- |
-| 3 | Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian | Future work |
 | 4 | Hệ thống tự nâng cảnh báo lên critical khi có nhiều event cùng loại trong 60 giây | Future work |
 | 5 | Client tìm kiếm cảnh báo theo nội dung hoặc tên/ID thiết bị | Future work |
 
@@ -245,6 +247,14 @@ Chi tiết Backlog 2 đã được tách riêng để dễ đọc và test theo 
 
 ---
 
+## Luồng Test Backlog 3 Cho Reviewer
+
+Chi tiết Backlog 3 đã được tách riêng để dễ đọc và test theo từng bước:
+
+- [docs/backlog-3.md](docs/backlog-3.md) — client xem và lọc danh sách alert theo device, severity và thời gian, có pagination.
+
+---
+
 ## API Reference
 
 Base URL:
@@ -295,6 +305,7 @@ http://localhost:8080/api/v1
 | --- | --- | --- |
 | POST | `/events` | Device gửi một alert event realtime |
 | POST | `/events/batch` | Device gửi nhiều alert events trong một request, tối đa 100 events |
+| GET | `/alerts` | Client xem/lọc danh sách alert theo device, severity, thời gian, có pagination |
 | GET | `/alerts/stream` | Client mở SSE stream để nhận realtime alerts |
 
 ---
@@ -417,11 +428,10 @@ schema_migrations
 
 ## Giới Hạn Hiện Tại
 
-Project này cố ý chỉ triển khai Backlog 1 và Backlog 2.
+Project này cố ý chỉ triển khai Backlog 1, Backlog 2 và Backlog 3.
 
 Chưa bao gồm trong phạm vi hiện tại:
 
-- API xem/lọc danh sách alert theo device, severity và thời gian của Backlog 3.
 - Tự động nâng cảnh báo lên critical khi event lặp lại của Backlog 4.
 - Tìm kiếm alert theo nội dung hoặc tên/ID device của Backlog 5.
 - Rate limiting, idempotency key, partitioning bảng alert cho production traffic rất lớn.
@@ -434,7 +444,7 @@ Chưa bao gồm trong phạm vi hiện tại:
 
 - API đã có Swagger và có thể test trực tiếp bằng Swagger UI.
 - Development environment có seed demo client để reviewer test nhanh.
-- Database schema dùng `clients`, `client_tokens`, `devices`, và `alerts` để giữ mental model rõ ràng cho Backlog 1 và Backlog 2.
+- Database schema dùng `clients`, `client_tokens`, `devices`, và `alerts` để giữ mental model rõ ràng cho Backlog 1, Backlog 2 và Backlog 3.
 - `client_tokens` lưu auth session/refresh-token metadata; raw refresh token không bao giờ được lưu trực tiếp.
 - `alerts` lưu realtime event append-only; realtime delivery dùng PostgreSQL LISTEN/NOTIFY và SSE.
 - Device ingest dùng device API key, còn client stream dùng JWT access token.

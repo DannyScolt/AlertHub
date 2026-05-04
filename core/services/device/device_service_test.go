@@ -6,11 +6,8 @@ import (
 	"time"
 
 	"alerthub/core/config"
-	alertDomain "alerthub/core/domain/alert"
 	domain "alerthub/core/domain/device"
 	deviceDto "alerthub/core/dto/device"
-	deviceRepo "alerthub/core/repository/device"
-
 	"github.com/google/uuid"
 )
 
@@ -28,47 +25,7 @@ func (r *createDeviceRepoStub) ExistsActiveName(ctx context.Context, clientID uu
 	return false, nil
 }
 
-func (r *createDeviceRepoStub) FindByID(ctx context.Context, clientID, deviceID uuid.UUID, includeDeleted bool) (domain.Device, error) {
-	return domain.Device{}, deviceRepo.ErrDeviceNotFound
-}
-
-func (r *createDeviceRepoStub) FindByAPIKeyHash(ctx context.Context, apiKeyHash string) (domain.Device, error) {
-	return domain.Device{}, deviceRepo.ErrDeviceNotFound
-}
-
-func (r *createDeviceRepoStub) List(ctx context.Context, clientID uuid.UUID, filter deviceRepo.ListFilter) (deviceRepo.ListResult, error) {
-	return deviceRepo.ListResult{}, nil
-}
-
-func (r *createDeviceRepoStub) Update(ctx context.Context, device domain.Device) (domain.Device, error) {
-	return domain.Device{}, nil
-}
-
-func (r *createDeviceRepoStub) SoftDelete(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error) {
-	return domain.Device{}, nil
-}
-
-func (r *createDeviceRepoStub) Restore(ctx context.Context, clientID, deviceID uuid.UUID) (domain.Device, error) {
-	return domain.Device{}, nil
-}
-
-func (r *createDeviceRepoStub) UpdateAPIKeyHash(ctx context.Context, clientID, deviceID uuid.UUID, apiKeyHash string) error {
-	return nil
-}
-
 type deviceAlertRepoStub struct{}
-
-func (r deviceAlertRepoStub) Create(ctx context.Context, alert alertDomain.Alert) (alertDomain.Alert, error) {
-	return alertDomain.Alert{}, nil
-}
-
-func (r deviceAlertRepoStub) CreateBatch(ctx context.Context, alerts []alertDomain.Alert) ([]alertDomain.Alert, error) {
-	return nil, nil
-}
-
-func (r deviceAlertRepoStub) FindByID(ctx context.Context, alertID uuid.UUID) (alertDomain.Alert, error) {
-	return alertDomain.Alert{}, nil
-}
 
 func (r deviceAlertRepoStub) LatestOccurredAtByDeviceID(ctx context.Context, deviceID uuid.UUID) (*time.Time, error) {
 	return nil, nil
@@ -76,7 +33,7 @@ func (r deviceAlertRepoStub) LatestOccurredAtByDeviceID(ctx context.Context, dev
 
 func TestCreateDeviceDefaultsOptionalTagsAndMetadata(t *testing.T) {
 	repo := &createDeviceRepoStub{}
-	service := NewDeviceService(&config.Config{DeviceAPIKeyPrefix: "ah_test"}, repo, deviceAlertRepoStub{})
+	service := NewFocusedDeviceService(&config.Config{DeviceAPIKeyPrefix: "ah_test"}, repo, nil, nil, nil, nil, deviceAlertRepoStub{})
 
 	_, err := service.CreateDevice(context.Background(), uuid.New(), deviceDto.CreateDeviceRequest{
 		Name: "Minimal Device",

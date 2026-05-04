@@ -1,5 +1,51 @@
 basePath: /api/v1
 definitions:
+  alert.AlertPaginationMeta:
+    properties:
+      has_next:
+        example: true
+        type: boolean
+      has_previous:
+        example: false
+        type: boolean
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 20
+        type: integer
+      total:
+        example: 100
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+    type: object
+  alert.AlertResponse:
+    properties:
+      device_id:
+        example: 4d285f4b-2a87-4a86-a5b8-05b09c6d1234
+        type: string
+      id:
+        example: 9f3d2e1a-1234-4321-abcd-1234567890ab
+        type: string
+      message:
+        example: Temperature exceeded 80°C
+        type: string
+      occurred_at:
+        type: string
+      payload:
+        additionalProperties: true
+        type: object
+      received_at:
+        type: string
+      severity:
+        example: warning
+        type: string
+      type:
+        example: high_temperature
+        type: string
+    type: object
   alert.BatchAcceptedAlert:
     properties:
       alert_id:
@@ -99,6 +145,21 @@ definitions:
       received_at:
         example: "2026-05-03T12:00:00.123Z"
         type: string
+    type: object
+  alert.ListAlertsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/alert.AlertResponse'
+        type: array
+      message:
+        example: Alerts retrieved successfully
+        type: string
+      pagination:
+        $ref: '#/definitions/alert.AlertPaginationMeta'
+      status:
+        example: true
+        type: boolean
     type: object
   alert.StreamAlertEvent:
     properties:
@@ -494,6 +555,73 @@ info:
   title: AlertHub API
   version: "1.0"
 paths:
+  /alerts:
+    get:
+      description: Returns paginated alerts owned by the authenticated client (Backlog
+        3). Filter by `device_id`, one or more `severity` values (`info`, `warning`,
+        `critical`), and a time range on `occurred_at` using `from` and `to` in RFC3339.
+        Results are scoped to the current client and ordered by `occurred_at DESC,
+        id DESC`. The response never includes `client_id` or any device API key material.
+      parameters:
+      - description: Filter to a single device id (UUID)
+        example: 4d285f4b-2a87-4a86-a5b8-05b09c6d1234
+        in: query
+        name: device_id
+        type: string
+      - collectionFormat: multi
+        description: Filter by severity. Repeat to combine, e.g. severity=warning&severity=critical
+        in: query
+        items:
+          enum:
+          - info
+          - warning
+          - critical
+          type: string
+        name: severity
+        type: array
+      - description: Inclusive lower bound on occurred_at, RFC3339
+        example: "2026-05-01T00:00:00Z"
+        in: query
+        name: from
+        type: string
+      - description: Inclusive upper bound on occurred_at, RFC3339
+        example: "2026-05-04T23:59:59Z"
+        in: query
+        name: to
+        type: string
+      - default: 1
+        description: Page number, starts at 1
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alerts retrieved successfully with pagination metadata.
+          schema:
+            $ref: '#/definitions/alert.ListAlertsResponse'
+        "400":
+          description: Validation error on filters or pagination.
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+        "401":
+          description: Missing or invalid access token.
+          schema:
+            $ref: '#/definitions/common.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List alerts for the authenticated client
+      tags:
+      - Alerts
   /alerts/stream:
     get:
       description: 'Opens an SSE connection for the authenticated client. Use client
