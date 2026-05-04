@@ -51,11 +51,16 @@ type DeviceActivityRepository interface {
 	LatestOccurredAtByDeviceID(ctx context.Context, deviceID uuid.UUID) (*time.Time, error)
 }
 
+type WindowCounter interface {
+	ListSameTypeIDsWithinWindow(ctx context.Context, deviceID uuid.UUID, alertType string, since time.Time) ([]uuid.UUID, error)
+}
+
 type AlertRepository interface {
 	IngestRepository
 	QueryRepository
 	LookupRepository
 	DeviceActivityRepository
+	WindowCounter
 }
 
 type alertRepository struct{ db *pgxpool.Pool }
@@ -175,6 +180,27 @@ func (r *alertRepository) LatestOccurredAtByDeviceID(ctx context.Context, device
 		return nil, err
 	}
 	return ts, nil
+}
+
+func (r *alertRepository) ListSameTypeIDsWithinWindow(ctx context.Context, deviceID uuid.UUID, alertType string, since time.Time) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx, `SELECT id FROM alerts WHERE device_id=$1 AND type=$2 AND occurred_at >= $3 ORDER BY occurred_at ASC, id ASC`, deviceID, alertType, since)
+	if err != nil {
+		return nil, mapPgError(err)
+	}
+	defer rows.Close()
+
+	ids := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, mapPgError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapPgError(err)
+	}
+	return ids, nil
 }
 
 func mapPgError(err error) error {

@@ -1,14 +1,16 @@
 # AlertHub API
 
-AlertHub là REST API viết bằng Go cho bài **Backend Coding Challenge**. Bài nộp này đã triển khai Backlog 1, Backlog 2 và Backlog 3:
+AlertHub là REST API viết bằng Go cho bài **Backend Coding Challenge**. Bài nộp này đã triển khai Backlog 1, Backlog 2, Backlog 3 và Backlog 4:
 
 > Backlog 1: Là một client, tôi có thể đăng ký thiết bị mới vào hệ thống và truy vấn danh sách thiết bị theo trạng thái.
 >
 > Backlog 2: Thiết bị gửi event cảnh báo realtime lên hệ thống.
 >
 > Backlog 3: Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian.
+>
+> Backlog 4: Hệ thống tự nâng cảnh báo lên critical khi một device gửi nhiều event cùng loại trong rolling window.
 
-Project có đầy đủ authentication cho client, device API key auth, alert ingestion, realtime SSE stream, alert query API với filter và pagination, PostgreSQL storage, Swagger documentation, Docker local development và cấu trúc code theo từng layer để reviewer có thể chạy/test nhanh.
+Project có đầy đủ authentication cho client, device API key auth, alert ingestion, realtime SSE stream, alert query API với filter và pagination, auto-escalation qua PostgreSQL LISTEN/NOTIFY + Redis cooldown, PostgreSQL storage, Swagger documentation, Docker local development và cấu trúc code theo từng layer để reviewer có thể chạy/test nhanh.
 
 ---
 
@@ -21,6 +23,7 @@ Project có đầy đủ authentication cho client, device API key auth, alert i
 | 1 | Client có thể đăng ký thiết bị mới và xem danh sách thiết bị theo trạng thái | Hoàn thành |
 | 2 | Thiết bị gửi event cảnh báo realtime lên hệ thống | Hoàn thành |
 | 3 | Client xem/lọc danh sách cảnh báo theo thiết bị, mức độ nghiêm trọng và thời gian | Hoàn thành |
+| 4 | Hệ thống tự nâng cảnh báo lên critical khi có nhiều event cùng loại trong 60 giây | Hoàn thành |
 
 ### Chưa triển khai
 
@@ -28,7 +31,6 @@ Các backlog bên dưới nằm ngoài phạm vi hiện tại:
 
 | Backlog | Yêu cầu | Trạng thái |
 | --- | --- | --- |
-| 4 | Hệ thống tự nâng cảnh báo lên critical khi có nhiều event cùng loại trong 60 giây | Future work |
 | 5 | Client tìm kiếm cảnh báo theo nội dung hoặc tên/ID thiết bị | Future work |
 
 ---
@@ -40,6 +42,7 @@ Các backlog bên dưới nằm ngoài phạm vi hiện tại:
 | Ngôn ngữ | Go |
 | HTTP framework | Gin |
 | Database | PostgreSQL |
+| Cooldown store | Redis có password |
 | Database driver | pgx / pgxpool |
 | Authentication | JWT access token + opaque refresh token |
 | Hash password | bcrypt |
@@ -134,6 +137,21 @@ DATABASE_URL=postgres://alerthub:alerthub@localhost:5432/alerthub?sslmode=disabl
 ```
 
 Khi chạy bằng Docker Compose, API container sẽ override `DATABASE_URL` để trỏ tới Docker service name là `postgres`.
+
+Backlog 4 dùng Redis cho cooldown atomic khi auto-escalate. Khi burst đạt threshold, API append thêm alert `severity="critical"`, `type="auto_escalated"`; payload có `source_alert_ids` là đầy đủ alert IDs nguồn trong rolling window. API tự build Redis connection URL nội bộ từ các biến dưới đây:
+
+```env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=change-me-redis-password
+REDIS_DB=0
+ESCALATION_ENABLED=true
+ESCALATION_THRESHOLD=3
+ESCALATION_WINDOW=60s
+ESCALATION_COOLDOWN=5m
+```
+
+Khi chạy bằng Docker Compose, API container override `REDIS_HOST=redis`. Ở `APP_ENV=staging` hoặc `APP_ENV=production`, `REDIS_PASSWORD` không được rỗng và không được dùng giá trị development mặc định.
 
 ---
 
@@ -252,6 +270,14 @@ Chi tiết Backlog 2 đã được tách riêng để dễ đọc và test theo 
 Chi tiết Backlog 3 đã được tách riêng để dễ đọc và test theo từng bước:
 
 - [docs/backlog-3.md](docs/backlog-3.md) — client xem và lọc danh sách alert theo device, severity và thời gian, có pagination.
+
+---
+
+## Luồng Test Backlog 4 Cho Reviewer
+
+Chi tiết Backlog 4 đã được tách riêng để dễ đọc và test theo từng bước:
+
+- [docs/backlog-4.md](docs/backlog-4.md) — auto-escalation critical alert, Redis cooldown, payload `source_alert_ids` đầy đủ, smoke test burst/cooldown/cross-client/latency.
 
 ---
 
@@ -428,11 +454,10 @@ schema_migrations
 
 ## Giới Hạn Hiện Tại
 
-Project này cố ý chỉ triển khai Backlog 1, Backlog 2 và Backlog 3.
+Project này cố ý triển khai Backlog 1 đến Backlog 4.
 
 Chưa bao gồm trong phạm vi hiện tại:
 
-- Tự động nâng cảnh báo lên critical khi event lặp lại của Backlog 4.
 - Tìm kiếm alert theo nội dung hoặc tên/ID device của Backlog 5.
 - Rate limiting, idempotency key, partitioning bảng alert cho production traffic rất lớn.
 - Production Docker image hardening.
@@ -447,4 +472,5 @@ Chưa bao gồm trong phạm vi hiện tại:
 - Database schema dùng `clients`, `client_tokens`, `devices`, và `alerts` để giữ mental model rõ ràng cho Backlog 1, Backlog 2 và Backlog 3.
 - `client_tokens` lưu auth session/refresh-token metadata; raw refresh token không bao giờ được lưu trực tiếp.
 - `alerts` lưu realtime event append-only; realtime delivery dùng PostgreSQL LISTEN/NOTIFY và SSE.
+- Auto-escalation tạo alert mới `severity="critical"`, `type="auto_escalated"` khi cùng `(device_id,type)` đạt ngưỡng trong window; Redis đảm bảo cooldown atomic.
 - Device ingest dùng device API key, còn client stream dùng JWT access token.

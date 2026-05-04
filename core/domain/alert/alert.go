@@ -13,6 +13,8 @@ const (
 	SeverityInfo     Severity = "info"
 	SeverityWarning  Severity = "warning"
 	SeverityCritical Severity = "critical"
+
+	TypeAutoEscalated = "auto_escalated"
 )
 
 type Alert struct {

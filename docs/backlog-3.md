@@ -303,6 +303,7 @@ Response: alert match đủ tất cả điều kiện.
 - Pagination hard cap 100 cho `page_size`.
 - Response item không chứa `client_id`; cũng không chứa raw device API key (bảng `alerts` không lưu key).
 - Alert là append-only: API hiện tại không có endpoint update/delete alert.
+- Backlog 4 có thể append alert `type="auto_escalated"`, `severity="critical"`; client có thể thấy alert này trong `/alerts`, payload có `source_alert_ids` chứa đầy đủ alert IDs nguồn trong rolling window, và client có thể tự filter theo `type` nếu cần.
 
 ---
 

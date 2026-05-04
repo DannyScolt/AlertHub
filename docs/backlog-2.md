@@ -490,6 +490,7 @@ Tối đa 100 events/request
 - Device gửi alert bằng raw device API key qua header `Authorization: Bearer ah_dev_xxx`.
 - Client nhận realtime alert bằng JWT access token qua `GET /alerts/stream`.
 - Alert là append-only event; API hiện tại không update/delete alert.
+- Backlog 4 có thể append thêm alert `type="auto_escalated"`, `severity="critical"`; alert này cũng đi qua stream như alert thường và payload có `source_alert_ids` chứa đầy đủ alert IDs nguồn trong rolling window.
 - `type` là free string, không được rỗng và tối đa 100 ký tự.
 - `message` không được rỗng.
 - `severity` chỉ nhận `info`, `warning`, `critical`.

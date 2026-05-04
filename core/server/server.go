@@ -3,10 +3,13 @@ package server
 import (
 	"context"
 	"log"
+	"time"
 
 	"alerthub/core/config"
+	redisInfra "alerthub/core/infra/redis"
 	"alerthub/core/middleware"
 	alertRepo "alerthub/core/repository/alert"
+	escalationRepo "alerthub/core/repository/escalation"
 	"alerthub/core/router"
 	alertService "alerthub/core/services/alert"
 
@@ -25,6 +28,24 @@ func Run(cfg *config.Config, db *pgxpool.Pool) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go listener.Run(ctx)
+
+	redisClient, err := redisInfra.NewClient(ctx, cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+	cooldownStore := escalationRepo.NewRedisCooldownStore(redisClient)
+	escalationService := alertService.NewEscalationService(
+		alertRepository,
+		alertRepository,
+		alertRepository,
+		alertRepo.NewNotifier(db),
+		cooldownStore,
+		alertService.EscalationConfig{Enabled: cfg.EscalationEnabled, Threshold: cfg.EscalationThreshold, Window: cfg.EscalationWindow, Cooldown: cfg.EscalationCooldown},
+		func() time.Time { return time.Now().UTC() },
+	)
+	escalationListener := alertService.NewEscalationListener(db, escalationService)
+	go escalationListener.Run(ctx)
 
 	ginRouter := gin.New()
 	middleware.RegisterGlobal(ginRouter)

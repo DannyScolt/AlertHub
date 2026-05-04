@@ -24,7 +24,10 @@ import (
 func main() {
 	log.Println("Starting AlertHub API...")
 
-	cfg := config.LoadConfig()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 	db, err := database.NewPostgresPool(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
