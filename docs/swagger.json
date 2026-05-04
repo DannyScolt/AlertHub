@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "AlertHub IoT device management and realtime alert ingestion API for Backlog 1 and Backlog 2.",
+        "description": "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -\u003e BearerAuth for client JWT (from /auth/login). Use Authorize -\u003e DeviceAPIKey for device API key (from POST /devices).",
         "title": "AlertHub API",
         "contact": {},
         "version": "1.0"

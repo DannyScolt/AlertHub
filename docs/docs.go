@@ -1854,7 +1854,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "AlertHub API",
-	Description:      "AlertHub IoT device management and realtime alert ingestion API for Backlog 1 and Backlog 2.",
+	Description:      "AlertHub IoT device management and realtime alert API. Covers device registration (Backlog 1), realtime ingest with SSE (Backlog 2), alert query/filter/pagination (Backlog 3), auto-escalation with Redis cooldown (Backlog 4), and alert search (Backlog 5). Use Authorize -> BearerAuth for client JWT (from /auth/login). Use Authorize -> DeviceAPIKey for device API key (from POST /devices).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
