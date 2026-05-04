@@ -80,19 +80,22 @@ docker compose config --quiet
 
 ## Công Nghệ Sử Dụng
 
-| Hạng mục | Công nghệ |
-| --- | --- |
-| Ngôn ngữ | Go |
-| HTTP framework | Gin |
-| Database | PostgreSQL |
-| Cooldown store | Redis có password |
-| Database driver | pgx / pgxpool |
-| Authentication | JWT access token + opaque refresh token |
-| Hash password | bcrypt |
-| API docs | Swagger / OpenAPI qua swaggo |
-| Local runtime | Docker Compose |
-| Database inspection | Adminer |
-| Hot reload | Air |
+| Hạng mục | Công nghệ | Lý do chọn |
+| --- | --- | --- |
+| Ngôn ngữ | Go | Static type, build nhanh, concurrency tốt qua goroutine, phù hợp viết API I/O nhiều như ingest/stream alert |
+| HTTP framework | Gin | Nhẹ, performance cao, middleware đơn giản, ecosystem trưởng thành cho Go |
+| Database | PostgreSQL | Quan hệ rõ giữa `clients`/`devices`/`alerts`, có transaction, JSONB cho `payload`, enum cho `severity`, hỗ trợ `LISTEN/NOTIFY` cho realtime, có `pg_trgm` cho search |
+| Database driver | pgx / pgxpool | Driver Postgres native cho Go, hỗ trợ connection pool, prepared statement, `LISTEN/NOTIFY` và parsing chuẩn cho UUID/JSONB/timestamp |
+| Cooldown store | Redis (có password) | In-memory single-digit ms latency, primitive `SET NX EX` cho atomic claim cooldown auto-escalate, không cần broker phức tạp |
+| Realtime delivery | SSE (Server-Sent Events) | One-way từ server xuống client, dùng HTTP/HTTPS sẵn có, đơn giản hơn WebSocket cho scope alert push |
+| Internal fan-out | PostgreSQL `LISTEN/NOTIFY` | Sau khi insert alert, phát notify tới listener trong process; tái dùng Postgres, không thêm hạ tầng broker |
+| Authentication | JWT access token + opaque refresh token | Access token stateless, refresh token được hash + rotate trong `client_tokens` để revoke an toàn |
+| Hash password | bcrypt | Adaptive, có salt mặc định, chuẩn industry cho password hashing |
+| Search alert | `ILIKE` + `pg_trgm` GIN index | Substring search case-insensitive trên message/type/device name; trigram index giữ latency thấp ở reviewer-scale |
+| API docs | Swagger / OpenAPI qua swaggo | Generate spec từ godoc trên handler, reviewer mở Swagger UI test trực tiếp |
+| Local runtime | Docker Compose | One-command setup Postgres + Redis + API + Adminer + migrations cho reviewer |
+| Database inspection | Adminer | Web UI nhẹ để reviewer xem nhanh data Postgres |
+| Hot reload | Air | Tự rebuild API khi sửa code lúc dev |
 
 ---
 
@@ -139,6 +142,64 @@ router -> handler -> service -> repository -> PostgreSQL
 | Backlog 5 search nằm trong `GET /alerts` | Search là filter của alert history nên dùng chung pagination/order/isolation của Backlog 3 |
 | `ILIKE` + `pg_trgm` cho search | Reviewer cần substring search theo message/type/device name; trigram index giúp giữ latency thấp |
 | Tách handler/service/repository theo focused interfaces | Giữ code dễ test, tránh service phụ thuộc repository methods không liên quan |
+
+---
+
+## Tại Sao Chọn Redis Thay Vì Kafka Hoặc RabbitMQ
+
+Backlog 4 cần một thứ duy nhất: **claim cooldown atomic theo `(device_id, type)` để không emit duplicate alert critical trong window**. Đây không phải bài toán message queue, nên việc chọn tech phải đúng vai trò.
+
+### Vai trò thực tế của Redis trong project
+
+```text
+EscalationService.HandleNewAlert
+        │
+        │  SET NX EX  cooldown:{device_id}:{type}  1  300
+        │
+        ├─ thành công → là instance đầu tiên claim được, đi tạo critical alert
+        └─ thất bại  → đã có instance khác claim, skip để không emit duplicate
+```
+
+Không có queue, không có consumer group, không có retention. Chỉ có:
+
+- Một key cooldown per `(device_id, type)`
+- TTL bằng `ESCALATION_COOLDOWN`
+- Atomic check-and-set bằng `SET NX EX`
+
+### So sánh trực diện
+
+| Tiêu chí | Redis (đang dùng) | Kafka | RabbitMQ |
+| --- | --- | --- | --- |
+| Nhu cầu thật của Backlog 4 | Atomic cooldown lock + TTL | Pub/sub log + replay | Queue + routing |
+| Primitive phù hợp | `SET NX EX` 1 dòng | Topic + partition + offset | Exchange + queue + ack |
+| Hạ tầng tối thiểu | 1 service Redis | Kafka + ZooKeeper/KRaft | RabbitMQ + Erlang VM |
+| Latency ops cooldown | Sub-ms | Vài chục ms (write + ack) | Vài ms (publish + ack) |
+| Fit với bài toán | Trùng khít | Quá nặng cho 1 lock có TTL | Quá nặng cho 1 lock có TTL |
+| Operational cost | Thấp | Cao (cluster + tuning) | Trung bình (cluster + Erlang) |
+| Học và setup cho reviewer | Một container | Nhiều cấu hình | Nhiều cấu hình |
+
+### Tại sao không dùng Kafka
+
+- Kafka mạnh ở **append-only log + replay + high-throughput streaming**, đó không phải nhu cầu của cooldown.
+- Kafka không có primitive “atomic claim với TTL”; muốn làm cooldown phải tự build bằng external KV store hoặc compacted topic + consumer logic — đi vòng vô lý khi đã có Redis.
+- Kafka cluster + ZooKeeper/KRaft nặng hơn nhiều so với 1 container Redis cho một bài coding challenge.
+- Trong project, fan-out alert nội bộ đã được giải quyết bằng PostgreSQL `LISTEN/NOTIFY`, nên không có phần nào cần tới Kafka.
+
+### Tại sao không dùng RabbitMQ
+
+- RabbitMQ giải quyết **queue + routing + ack/retry**, hợp cho task queue hoặc work distribution giữa nhiều worker.
+- Backlog 4 không có producer/consumer queue: chỉ có một quyết định “được phép emit critical hay không” trong một process, không phân phối job.
+- Dùng RabbitMQ làm cooldown phải lạm dụng exchange/queue như một KV store — anti-pattern, mà vẫn cần TTL/idempotency tự xử.
+- Thêm RabbitMQ tăng moving parts mà không giải quyết thêm vấn đề so với Redis.
+
+### Khi nào nên đổi sang Kafka hoặc RabbitMQ
+
+Nếu yêu cầu thay đổi sang một trong các kịch bản dưới đây thì việc thêm broker mới hợp lý:
+
+- **Kafka**: cần stream alert sang nhiều consumer độc lập (data lake, analytics, ML pipeline), cần replay theo offset, traffic ingest lớn vượt khả năng Postgres `LISTEN/NOTIFY`.
+- **RabbitMQ**: cần work queue cho tác vụ async khác như gửi email/SMS/webhook với retry, dead-letter, routing theo header.
+
+Trong scope hiện tại của bài challenge, không kịch bản nào trên xảy ra, nên Redis là lựa chọn tối thiểu nhưng đủ.
 
 ---
 
